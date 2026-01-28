@@ -453,6 +453,7 @@ var GameManagerView = class extends import_obsidian.ItemView {
   constructor(leaf, plugin, dataManager) {
     super(leaf);
     this.activeTab = "home";
+    this.browseState = null;
     this.plugin = plugin;
     this.dataManager = dataManager;
   }
@@ -504,6 +505,7 @@ var GameManagerView = class extends import_obsidian.ItemView {
         tabsContainer.querySelectorAll(".gm-tab-btn").forEach((b) => b.removeClass("is-active"));
         btn.addClass("is-active");
         this.activeTab = tab.id;
+        this.browseState = null;
         this.renderTab();
       });
     });
@@ -682,184 +684,239 @@ var GameManagerView = class extends import_obsidian.ItemView {
     });
   }
   /**
-   * 渲染卡片式标签页（技能/装备/副本）- 真正的嵌套透明容器
+   * 渲染卡片式标签页（技能/装备/副本）- 三层嵌套卡片系统
    */
   renderCardTab(type, tree, title, desc, icon) {
+    if (!this.browseState || this.browseState.type !== type) {
+      this.browseState = { type, path: [] };
+    }
+    const currentNode = this.getNodeAtPath(tree, this.browseState.path);
     this.mainContentEl.createEl("h3", { text: `${icon} ${title}` });
     this.mainContentEl.createEl("p", { text: desc, cls: "gm-panel-desc" });
-    if (tree.children.length === 0 && tree.items.length === 0) {
+    if (this.browseState.path.length > 0) {
+      this.renderBreadcrumb(type, title, icon);
+    }
+    if (!currentNode || currentNode.children.length === 0 && currentNode.items.length === 0) {
       const empty = this.mainContentEl.createDiv({ cls: "gm-empty" });
-      empty.textContent = `\u6682\u65E0${title}\u6570\u636E\uFF0C\u5728\u7B14\u8BB0\u4E2D\u4F7F\u7528 #${type === "skills" ? "skill" : type === "equipment" ? "equip" : "dungeon"}-\u5206\u7C7B-\u5185\u5BB9 \u6DFB\u52A0`;
+      if (this.browseState.path.length === 0) {
+        empty.textContent = `\u6682\u65E0${title}\u6570\u636E\uFF0C\u5728\u7B14\u8BB0\u4E2D\u4F7F\u7528 #${type === "skills" ? "skill" : type === "equipment" ? "equip" : "dungeon"}-\u5206\u7C7B-\u5185\u5BB9 \u6DFB\u52A0`;
+      } else {
+        empty.textContent = "\u6B64\u5206\u7C7B\u4E0B\u6682\u65E0\u5185\u5BB9";
+      }
       return;
     }
-    const nestedList = this.mainContentEl.createDiv({ cls: "gm-nested-list" });
-    this.renderNestedContainers(nestedList, tree.children, tree.items, type);
+    this.renderThreeLevelCards(currentNode, type);
   }
   /**
-   * 递归渲染嵌套透明容器
+   * 渲染面包屑导航
    */
-  renderNestedContainers(parent, children, items, type) {
-    const typeIcon = type === "skills" ? "\u2694\uFE0F" : type === "equipment" ? "\u{1F6E1}\uFE0F" : "\u{1F3F0}";
-    children.forEach((node) => {
-      const totalItems = this.countAllItems(node);
-      const isLeaf = node.children.length === 0;
-      const container = parent.createDiv({ cls: "gm-nested-container" });
-      const header = container.createDiv({ cls: "gm-container-header" });
-      header.createDiv({ cls: "gm-container-icon", text: isLeaf ? "\u{1F4C4}" : "\u{1F4C1}" });
-      header.createDiv({ cls: "gm-container-title", text: node.name });
-      if (totalItems > 0) {
-        header.createDiv({ cls: "gm-container-badge", text: String(totalItems) });
+  renderBreadcrumb(type, title, icon) {
+    const breadcrumb = this.mainContentEl.createDiv({ cls: "gm-breadcrumb" });
+    const rootItem = breadcrumb.createSpan({ cls: "gm-breadcrumb-item", text: `${icon} ${title}` });
+    rootItem.addEventListener("click", () => {
+      if (this.browseState) {
+        this.browseState.path = [];
+        this.renderTab();
       }
-      const toggle = header.createDiv({ cls: "gm-container-toggle", text: "\u25B6" });
-      const content = container.createDiv({ cls: "gm-container-content" });
-      if (isLeaf) {
-        this.renderLeafItems(content, node.items, typeIcon);
-      } else {
-        const grid = content.createDiv({ cls: "gm-nested-grid" });
-        this.renderNestedChildren(grid, node.children, node.items, type, typeIcon);
-      }
-      header.addEventListener("click", () => {
-        const isExpanded = content.hasClass("is-visible");
-        if (isExpanded) {
-          content.removeClass("is-visible");
-          toggle.removeClass("is-expanded");
-        } else {
-          content.addClass("is-visible");
-          toggle.addClass("is-expanded");
-        }
-      });
     });
-    if (items.length > 0) {
-      const itemsContainer = parent.createDiv({ cls: "gm-nested-container" });
-      const header = itemsContainer.createDiv({ cls: "gm-container-header" });
-      header.createDiv({ cls: "gm-container-icon", text: "\u{1F4DD}" });
-      header.createDiv({ cls: "gm-container-title", text: "\u672A\u5206\u7C7B\u5185\u5BB9" });
-      header.createDiv({ cls: "gm-container-badge", text: String(items.length) });
-      const toggle = header.createDiv({ cls: "gm-container-toggle", text: "\u25B6" });
-      const content = itemsContainer.createDiv({ cls: "gm-container-content" });
-      this.renderLeafItems(content, items, typeIcon);
-      header.addEventListener("click", () => {
-        const isExpanded = content.hasClass("is-visible");
-        if (isExpanded) {
-          content.removeClass("is-visible");
-          toggle.removeClass("is-expanded");
+    if (this.browseState) {
+      this.browseState.path.forEach((segment, index) => {
+        breadcrumb.createSpan({ cls: "gm-breadcrumb-sep", text: "\u203A" });
+        if (index === this.browseState.path.length - 1) {
+          breadcrumb.createSpan({ cls: "gm-breadcrumb-current", text: segment });
         } else {
-          content.addClass("is-visible");
-          toggle.addClass("is-expanded");
+          const item = breadcrumb.createSpan({ cls: "gm-breadcrumb-item", text: segment });
+          item.addEventListener("click", () => {
+            if (this.browseState) {
+              this.browseState.path = this.browseState.path.slice(0, index + 1);
+              this.renderTab();
+            }
+          });
         }
       });
     }
   }
   /**
-   * 渲染嵌套子容器（第二层及更深层）
+   * 渲染三层嵌套卡片结构
    */
-  renderNestedChildren(grid, children, items, type, typeIcon) {
-    children.forEach((node) => {
-      const isLeaf = node.children.length === 0;
-      const totalItems = this.countAllItems(node);
-      const child = grid.createDiv({ cls: "gm-nested-child" });
-      const header = child.createDiv({ cls: "gm-nested-child-header" });
-      header.createDiv({ cls: "gm-nested-child-icon", text: isLeaf ? "\u{1F4C4}" : "\u{1F4C1}" });
-      header.createDiv({ cls: "gm-nested-child-title", text: node.name });
-      if (totalItems > 0) {
-        header.createDiv({ cls: "gm-nested-child-badge", text: String(totalItems) });
-      }
-      const preview = child.createDiv({ cls: "gm-nested-child-preview" });
-      this.renderPreviewDots(preview, node);
-      child.addEventListener("click", () => {
-        this.expandNodeDetails(node, type, typeIcon);
-      });
-    });
-    items.forEach((item) => {
-      const leaf = grid.createDiv({ cls: "gm-leaf-item" });
-      const header = leaf.createDiv({ cls: "gm-leaf-header" });
-      header.createDiv({ cls: "gm-leaf-icon", text: item.isFullFile ? "\u{1F4C4}" : "\u{1F4DD}" });
-      header.createDiv({ cls: "gm-leaf-title", text: item.content });
-      header.createDiv({ cls: "gm-leaf-source", text: this.getFileName(item.sourceFile) });
-      if (item.textContent) {
-        const contentEl = leaf.createDiv({ cls: "gm-leaf-content" });
-        contentEl.textContent = item.textContent.substring(0, 150) + (item.textContent.length > 150 ? "..." : "");
-      }
-      leaf.addEventListener("click", () => {
-        this.app.workspace.openLinkText(item.sourceFile, "", false);
-      });
-    });
-  }
-  /**
-   * 渲染预览小方块
-   */
-  renderPreviewDots(preview, node) {
-    const allItems = [];
+  renderThreeLevelCards(node, type) {
+    const grid = this.mainContentEl.createDiv({ cls: "gm-cards-lg-grid" });
     node.children.forEach((child) => {
-      allItems.push({ name: child.name, isFolder: child.children.length > 0 });
+      this.renderLargeCard(grid, child, type);
     });
     node.items.forEach((item) => {
-      allItems.push({ name: item.content, isFolder: false });
+      this.renderContentCard(grid, item, "lg");
     });
-    const maxShow = 5;
-    const showItems = allItems.slice(0, maxShow);
-    const remaining = allItems.length - maxShow;
-    showItems.forEach((item) => {
-      const dot = preview.createDiv({ cls: "gm-preview-dot" });
-      dot.textContent = item.name.substring(0, 4);
-    });
-    if (remaining > 0) {
-      const moreDot = preview.createDiv({ cls: "gm-preview-dot gm-preview-dot-more" });
-      moreDot.textContent = `+${remaining}`;
-    }
   }
   /**
-   * 展开节点详情（在当前视图下方显示）
+   * 渲染大卡片（第一层）
    */
-  expandNodeDetails(node, type, typeIcon) {
-    const existing = this.mainContentEl.querySelector(".gm-expanded-details");
-    if (existing) {
-      existing.remove();
+  renderLargeCard(container, node, type) {
+    const card = container.createDiv({ cls: "gm-card gm-card-lg" });
+    const totalItems = this.countAllItems(node);
+    const header = card.createDiv({ cls: "gm-card-header" });
+    header.createDiv({ cls: "gm-card-title", text: node.name });
+    if (totalItems > 0) {
+      header.createDiv({ cls: "gm-card-badge", text: String(totalItems) });
     }
-    const details = this.mainContentEl.createDiv({ cls: "gm-expanded-details gm-nested-container" });
-    details.style.marginTop = "24px";
-    const header = details.createDiv({ cls: "gm-container-header" });
-    header.createDiv({ cls: "gm-container-icon", text: "\u{1F4C2}" });
-    header.createDiv({ cls: "gm-container-title", text: `\u5C55\u5F00: ${node.name}` });
-    const closeBtn = header.createDiv({ cls: "gm-container-toggle", text: "\u2715" });
-    closeBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      details.remove();
-    });
-    const content = details.createDiv({ cls: "gm-container-content is-visible" });
-    if (node.children.length === 0) {
-      this.renderLeafItems(content, node.items, typeIcon);
-    } else {
-      const grid = content.createDiv({ cls: "gm-nested-grid" });
-      this.renderNestedChildren(grid, node.children, node.items, type, typeIcon);
-    }
-  }
-  /**
-   * 渲染叶子节点内容项
-   */
-  renderLeafItems(container, items, typeIcon) {
-    if (items.length === 0) {
-      container.createDiv({ cls: "gm-empty", text: "\u6682\u65E0\u5185\u5BB9" });
-      return;
-    }
-    const grid = container.createDiv({ cls: "gm-nested-grid" });
-    items.forEach((item) => {
-      const leaf = grid.createDiv({ cls: "gm-leaf-item" });
-      const header = leaf.createDiv({ cls: "gm-leaf-header" });
-      header.createDiv({ cls: "gm-leaf-icon", text: item.isFullFile ? "\u{1F4C4}" : typeIcon });
-      header.createDiv({ cls: "gm-leaf-title", text: item.content });
-      header.createDiv({ cls: "gm-leaf-source", text: this.getFileName(item.sourceFile) });
-      if (item.textContent) {
-        const contentEl = leaf.createDiv({ cls: "gm-leaf-content" });
-        contentEl.textContent = item.textContent;
+    const body = card.createDiv({ cls: "gm-card-body" });
+    if (node.children.length === 0 && node.items.length > 0) {
+      this.renderCardBodyContent(body, node.items, 4);
+    } else if (node.children.length > 0) {
+      const mdGrid = body.createDiv({ cls: "gm-cards-md-grid" });
+      const maxMd = 4;
+      const showChildren = node.children.slice(0, maxMd);
+      const remainingChildren = node.children.length - maxMd;
+      showChildren.forEach((child) => {
+        this.renderMediumCard(mdGrid, child, type);
+      });
+      const remainingSlots = maxMd - showChildren.length;
+      const showItems = node.items.slice(0, remainingSlots);
+      showItems.forEach((item) => {
+        this.renderContentCard(mdGrid, item, "md");
+      });
+      const totalRemaining = remainingChildren + Math.max(0, node.items.length - remainingSlots);
+      if (totalRemaining > 0) {
+        const more = mdGrid.createDiv({ cls: "gm-more-card" });
+        more.createSpan({ text: `+${totalRemaining} \u66F4\u591A` });
+        more.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.navigateToNode(node.name);
+        });
       }
-      leaf.addEventListener("click", () => {
+    }
+    card.addEventListener("click", () => {
+      this.navigateToNode(node.name);
+    });
+  }
+  /**
+   * 渲染中卡片（第二层）
+   */
+  renderMediumCard(container, node, type) {
+    const card = container.createDiv({ cls: "gm-card gm-card-md" });
+    const totalItems = this.countAllItems(node);
+    const header = card.createDiv({ cls: "gm-card-header" });
+    header.createDiv({ cls: "gm-card-title", text: node.name });
+    if (totalItems > 0) {
+      header.createDiv({ cls: "gm-card-badge", text: String(totalItems) });
+    }
+    const body = card.createDiv({ cls: "gm-card-body" });
+    if (node.children.length === 0 && node.items.length > 0) {
+      this.renderCardBodyContent(body, node.items, 2);
+    } else if (node.children.length > 0) {
+      const smGrid = body.createDiv({ cls: "gm-cards-sm-grid" });
+      const maxSm = 4;
+      const showChildren = node.children.slice(0, maxSm);
+      const remainingChildren = node.children.length - maxSm;
+      showChildren.forEach((child) => {
+        this.renderSmallCard(smGrid, child);
+      });
+      const totalRemaining = remainingChildren + node.items.length;
+      if (totalRemaining > 0) {
+        const more = smGrid.createDiv({ cls: "gm-more-card" });
+        more.createSpan({ text: `+${totalRemaining}` });
+      }
+    }
+    card.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.navigateToNode(node.name);
+    });
+  }
+  /**
+   * 渲染小卡片（第三层）
+   */
+  renderSmallCard(container, node) {
+    const card = container.createDiv({ cls: "gm-card gm-card-sm" });
+    const totalItems = this.countAllItems(node);
+    const header = card.createDiv({ cls: "gm-card-header" });
+    header.createDiv({ cls: "gm-card-title", text: node.name });
+    if (totalItems > 0) {
+      header.createDiv({ cls: "gm-card-badge", text: String(totalItems) });
+    }
+    const body = card.createDiv({ cls: "gm-card-body" });
+    const previewText = this.getNodePreviewText(node);
+    if (previewText) {
+      body.createDiv({ cls: "gm-card-preview", text: previewText });
+    }
+    card.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.navigateToNode(node.name);
+    });
+  }
+  /**
+   * 渲染内容卡片（叶子节点，显示具体文本）
+   */
+  renderContentCard(container, item, size) {
+    const card = container.createDiv({ cls: `gm-card gm-card-${size} gm-card-content` });
+    const header = card.createDiv({ cls: "gm-card-header" });
+    header.createDiv({ cls: "gm-card-title", text: item.content });
+    const body = card.createDiv({ cls: "gm-card-body" });
+    if (item.textContent) {
+      const maxLen = size === "lg" ? 200 : size === "md" ? 80 : 40;
+      const text = item.textContent.substring(0, maxLen) + (item.textContent.length > maxLen ? "..." : "");
+      body.createDiv({ cls: "gm-content-text", text });
+    }
+    const source = body.createDiv({ cls: "gm-content-source" });
+    const link = source.createEl("a", { text: this.getFileName(item.sourceFile) });
+    link.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.app.workspace.openLinkText(item.sourceFile, "", false);
+    });
+    card.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.app.workspace.openLinkText(item.sourceFile, "", false);
+    });
+  }
+  /**
+   * 在卡片 body 中渲染内容项列表
+   */
+  renderCardBodyContent(body, items, maxItems) {
+    const showItems = items.slice(0, maxItems);
+    const remaining = items.length - maxItems;
+    showItems.forEach((item) => {
+      const itemEl = body.createDiv({ cls: "gm-content-text" });
+      const text = item.textContent ? item.textContent.substring(0, 60) : item.content;
+      itemEl.textContent = text + (item.textContent && item.textContent.length > 60 ? "..." : "");
+      itemEl.style.marginBottom = "6px";
+      itemEl.style.cursor = "pointer";
+      itemEl.addEventListener("click", (e) => {
+        e.stopPropagation();
         this.app.workspace.openLinkText(item.sourceFile, "", false);
       });
     });
+    if (remaining > 0) {
+      const more = body.createDiv({ cls: "gm-content-source" });
+      more.textContent = `+${remaining} \u66F4\u591A\u5185\u5BB9`;
+    }
   }
   /**
-   * 根据路径获取节点（保留用于未来可能的功能）
+   * 获取节点预览文本
+   */
+  getNodePreviewText(node) {
+    const parts = [];
+    node.children.slice(0, 2).forEach((child) => {
+      parts.push(child.name);
+    });
+    node.items.slice(0, 2).forEach((item) => {
+      parts.push(item.content);
+    });
+    const remaining = node.children.length + node.items.length - parts.length;
+    if (remaining > 0) {
+      parts.push(`+${remaining}`);
+    }
+    return parts.join(", ");
+  }
+  /**
+   * 导航到指定节点
+   */
+  navigateToNode(nodeName) {
+    if (this.browseState) {
+      this.browseState.path.push(nodeName);
+      this.renderTab();
+    }
+  }
+  /**
+   * 根据路径获取节点
    */
   getNodeAtPath(tree, path) {
     let current = tree;

@@ -4,17 +4,24 @@
  */
 
 import { ItemView, WorkspaceLeaf } from 'obsidian';
-import { VIEW_TYPE_GAME_MANAGER, TreeNode, GameSet } from '../types';
+import { VIEW_TYPE_GAME_MANAGER, TreeNode, GameSet, TreeItem } from '../types';
 import { DataManager } from '../services/DataManager';
 import type GameManagerPlugin from '../main';
 
 type TabType = 'home' | 'skills' | 'equipment' | 'dungeon';
+
+// 浏览状态：记录当前路径
+interface BrowseState {
+  type: 'skills' | 'equipment' | 'dungeon';
+  path: string[];
+}
 
 export class GameManagerView extends ItemView {
   private plugin: GameManagerPlugin;
   private dataManager: DataManager;
   private activeTab: TabType = 'home';
   private mainContentEl: HTMLElement;
+  private browseState: BrowseState | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: GameManagerPlugin, dataManager: DataManager) {
     super(leaf);
@@ -88,6 +95,8 @@ export class GameManagerView extends ItemView {
         tabsContainer.querySelectorAll('.gm-tab-btn').forEach(b => b.removeClass('is-active'));
         btn.addClass('is-active');
         this.activeTab = tab.id;
+        // 切换标签页时重置浏览状态
+        this.browseState = null;
         this.renderTab();
       });
     });
@@ -312,251 +321,322 @@ export class GameManagerView extends ItemView {
   }
 
   /**
-   * 渲染卡片式标签页（技能/装备/副本）- 真正的嵌套透明容器
+   * 渲染卡片式标签页（技能/装备/副本）- 三层嵌套卡片系统
    */
   private renderCardTab(type: 'skills' | 'equipment' | 'dungeon', tree: TreeNode, title: string, desc: string, icon: string): void {
+    // 初始化或恢复浏览状态
+    if (!this.browseState || this.browseState.type !== type) {
+      this.browseState = { type, path: [] };
+    }
+
+    // 获取当前路径对应的节点
+    const currentNode = this.getNodeAtPath(tree, this.browseState.path);
+
     // 标题
     this.mainContentEl.createEl('h3', { text: `${icon} ${title}` });
     this.mainContentEl.createEl('p', { text: desc, cls: 'gm-panel-desc' });
 
+    // 面包屑导航（如果有路径）
+    if (this.browseState.path.length > 0) {
+      this.renderBreadcrumb(type, title, icon);
+    }
+
     // 判断当前节点状态
-    if (tree.children.length === 0 && tree.items.length === 0) {
-      // 空状态
+    if (!currentNode || (currentNode.children.length === 0 && currentNode.items.length === 0)) {
       const empty = this.mainContentEl.createDiv({ cls: 'gm-empty' });
-      empty.textContent = `暂无${title}数据，在笔记中使用 #${type === 'skills' ? 'skill' : type === 'equipment' ? 'equip' : 'dungeon'}-分类-内容 添加`;
+      if (this.browseState.path.length === 0) {
+        empty.textContent = `暂无${title}数据，在笔记中使用 #${type === 'skills' ? 'skill' : type === 'equipment' ? 'equip' : 'dungeon'}-分类-内容 添加`;
+      } else {
+        empty.textContent = '此分类下暂无内容';
+      }
       return;
     }
 
-    // 渲染嵌套容器结构
-    const nestedList = this.mainContentEl.createDiv({ cls: 'gm-nested-list' });
-    this.renderNestedContainers(nestedList, tree.children, tree.items, type);
+    // 渲染三层嵌套卡片
+    this.renderThreeLevelCards(currentNode, type);
   }
 
   /**
-   * 递归渲染嵌套透明容器
+   * 渲染面包屑导航
    */
-  private renderNestedContainers(parent: HTMLElement, children: TreeNode[], items: import('../types').TreeItem[], type: 'skills' | 'equipment' | 'dungeon'): void {
-    const typeIcon = type === 'skills' ? '⚔️' : type === 'equipment' ? '🛡️' : '🏰';
+  private renderBreadcrumb(type: 'skills' | 'equipment' | 'dungeon', title: string, icon: string): void {
+    const breadcrumb = this.mainContentEl.createDiv({ cls: 'gm-breadcrumb' });
 
-    // 渲染所有子目录作为嵌套容器
-    children.forEach(node => {
-      const totalItems = this.countAllItems(node);
-      const isLeaf = node.children.length === 0; // 没有子目录就是叶子
-
-      // 创建外层透明容器
-      const container = parent.createDiv({ cls: 'gm-nested-container' });
-
-      // 容器标题栏（带分隔线）
-      const header = container.createDiv({ cls: 'gm-container-header' });
-      header.createDiv({ cls: 'gm-container-icon', text: isLeaf ? '📄' : '📁' });
-      header.createDiv({ cls: 'gm-container-title', text: node.name });
-      if (totalItems > 0) {
-        header.createDiv({ cls: 'gm-container-badge', text: String(totalItems) });
+    // 根节点
+    const rootItem = breadcrumb.createSpan({ cls: 'gm-breadcrumb-item', text: `${icon} ${title}` });
+    rootItem.addEventListener('click', () => {
+      if (this.browseState) {
+        this.browseState.path = [];
+        this.renderTab();
       }
-      const toggle = header.createDiv({ cls: 'gm-container-toggle', text: '▶' });
-
-      // 容器内容区
-      const content = container.createDiv({ cls: 'gm-container-content' });
-
-      if (isLeaf) {
-        // 叶子节点：显示具体内容项
-        this.renderLeafItems(content, node.items, typeIcon);
-      } else {
-        // 非叶子：显示子容器网格
-        const grid = content.createDiv({ cls: 'gm-nested-grid' });
-        this.renderNestedChildren(grid, node.children, node.items, type, typeIcon);
-      }
-
-      // 点击标题栏展开/折叠
-      header.addEventListener('click', () => {
-        const isExpanded = content.hasClass('is-visible');
-        if (isExpanded) {
-          content.removeClass('is-visible');
-          toggle.removeClass('is-expanded');
-        } else {
-          content.addClass('is-visible');
-          toggle.addClass('is-expanded');
-        }
-      });
     });
 
-    // 渲染根级别的内容项（如果有）
-    if (items.length > 0) {
-      const itemsContainer = parent.createDiv({ cls: 'gm-nested-container' });
-      const header = itemsContainer.createDiv({ cls: 'gm-container-header' });
-      header.createDiv({ cls: 'gm-container-icon', text: '📝' });
-      header.createDiv({ cls: 'gm-container-title', text: '未分类内容' });
-      header.createDiv({ cls: 'gm-container-badge', text: String(items.length) });
-      const toggle = header.createDiv({ cls: 'gm-container-toggle', text: '▶' });
+    // 路径节点
+    if (this.browseState) {
+      this.browseState.path.forEach((segment, index) => {
+        breadcrumb.createSpan({ cls: 'gm-breadcrumb-sep', text: '›' });
 
-      const content = itemsContainer.createDiv({ cls: 'gm-container-content' });
-      this.renderLeafItems(content, items, typeIcon);
-
-      header.addEventListener('click', () => {
-        const isExpanded = content.hasClass('is-visible');
-        if (isExpanded) {
-          content.removeClass('is-visible');
-          toggle.removeClass('is-expanded');
+        if (index === this.browseState!.path.length - 1) {
+          // 当前节点（不可点击）
+          breadcrumb.createSpan({ cls: 'gm-breadcrumb-current', text: segment });
         } else {
-          content.addClass('is-visible');
-          toggle.addClass('is-expanded');
+          // 可点击的父节点
+          const item = breadcrumb.createSpan({ cls: 'gm-breadcrumb-item', text: segment });
+          item.addEventListener('click', () => {
+            if (this.browseState) {
+              this.browseState.path = this.browseState.path.slice(0, index + 1);
+              this.renderTab();
+            }
+          });
         }
       });
     }
   }
 
   /**
-   * 渲染嵌套子容器（第二层及更深层）
+   * 渲染三层嵌套卡片结构
    */
-  private renderNestedChildren(grid: HTMLElement, children: TreeNode[], items: import('../types').TreeItem[], type: 'skills' | 'equipment' | 'dungeon', typeIcon: string): void {
-    // 渲染子目录作为嵌套子容器
-    children.forEach(node => {
-      const isLeaf = node.children.length === 0;
-      const totalItems = this.countAllItems(node);
+  private renderThreeLevelCards(node: TreeNode, type: 'skills' | 'equipment' | 'dungeon'): void {
+    const grid = this.mainContentEl.createDiv({ cls: 'gm-cards-lg-grid' });
 
-      // 子透明容器
-      const child = grid.createDiv({ cls: 'gm-nested-child' });
-
-      // 子容器标题栏
-      const header = child.createDiv({ cls: 'gm-nested-child-header' });
-      header.createDiv({ cls: 'gm-nested-child-icon', text: isLeaf ? '📄' : '📁' });
-      header.createDiv({ cls: 'gm-nested-child-title', text: node.name });
-      if (totalItems > 0) {
-        header.createDiv({ cls: 'gm-nested-child-badge', text: String(totalItems) });
-      }
-
-      // 预览区：显示更深层的小方块
-      const preview = child.createDiv({ cls: 'gm-nested-child-preview' });
-      this.renderPreviewDots(preview, node);
-
-      // 点击展开为独立的对话框或就地展开
-      child.addEventListener('click', () => {
-        // 在页面下方展开详情
-        this.expandNodeDetails(node, type, typeIcon);
-      });
+    // 渲染子目录作为大卡片
+    node.children.forEach(child => {
+      this.renderLargeCard(grid, child, type);
     });
 
-    // 渲染此级别的内容项
-    items.forEach(item => {
-      const leaf = grid.createDiv({ cls: 'gm-leaf-item' });
-
-      const header = leaf.createDiv({ cls: 'gm-leaf-header' });
-      header.createDiv({ cls: 'gm-leaf-icon', text: item.isFullFile ? '📄' : '📝' });
-      header.createDiv({ cls: 'gm-leaf-title', text: item.content });
-      header.createDiv({ cls: 'gm-leaf-source', text: this.getFileName(item.sourceFile) });
-
-      if (item.textContent) {
-        const contentEl = leaf.createDiv({ cls: 'gm-leaf-content' });
-        contentEl.textContent = item.textContent.substring(0, 150) + (item.textContent.length > 150 ? '...' : '');
-      }
-
-      leaf.addEventListener('click', () => {
-        this.app.workspace.openLinkText(item.sourceFile, '', false);
-      });
+    // 渲染根级内容项作为内容卡片
+    node.items.forEach(item => {
+      this.renderContentCard(grid, item, 'lg');
     });
   }
 
   /**
-   * 渲染预览小方块
+   * 渲染大卡片（第一层）
    */
-  private renderPreviewDots(preview: HTMLElement, node: TreeNode): void {
-    const allItems: Array<{ name: string; isFolder: boolean }> = [];
+  private renderLargeCard(container: HTMLElement, node: TreeNode, type: 'skills' | 'equipment' | 'dungeon'): void {
+    const card = container.createDiv({ cls: 'gm-card gm-card-lg' });
+    const totalItems = this.countAllItems(node);
 
-    // 收集子目录
-    node.children.forEach(child => {
-      allItems.push({ name: child.name, isFolder: child.children.length > 0 });
+    // 头部
+    const header = card.createDiv({ cls: 'gm-card-header' });
+    header.createDiv({ cls: 'gm-card-title', text: node.name });
+    if (totalItems > 0) {
+      header.createDiv({ cls: 'gm-card-badge', text: String(totalItems) });
+    }
+
+    // 内容区
+    const body = card.createDiv({ cls: 'gm-card-body' });
+
+    if (node.children.length === 0 && node.items.length > 0) {
+      // 叶子节点：显示内容
+      this.renderCardBodyContent(body, node.items, 4);
+    } else if (node.children.length > 0) {
+      // 有子目录：显示中卡片网格
+      const mdGrid = body.createDiv({ cls: 'gm-cards-md-grid' });
+      const maxMd = 4;
+      const showChildren = node.children.slice(0, maxMd);
+      const remainingChildren = node.children.length - maxMd;
+
+      showChildren.forEach(child => {
+        this.renderMediumCard(mdGrid, child, type);
+      });
+
+      // 显示此级别的内容项（如果有）
+      const remainingSlots = maxMd - showChildren.length;
+      const showItems = node.items.slice(0, remainingSlots);
+      showItems.forEach(item => {
+        this.renderContentCard(mdGrid, item, 'md');
+      });
+
+      // "+N 更多" 指示器
+      const totalRemaining = remainingChildren + Math.max(0, node.items.length - remainingSlots);
+      if (totalRemaining > 0) {
+        const more = mdGrid.createDiv({ cls: 'gm-more-card' });
+        more.createSpan({ text: `+${totalRemaining} 更多` });
+        more.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.navigateToNode(node.name);
+        });
+      }
+    }
+
+    // 点击卡片进入内部
+    card.addEventListener('click', () => {
+      this.navigateToNode(node.name);
+    });
+  }
+
+  /**
+   * 渲染中卡片（第二层）
+   */
+  private renderMediumCard(container: HTMLElement, node: TreeNode, type: 'skills' | 'equipment' | 'dungeon'): void {
+    const card = container.createDiv({ cls: 'gm-card gm-card-md' });
+    const totalItems = this.countAllItems(node);
+
+    // 头部
+    const header = card.createDiv({ cls: 'gm-card-header' });
+    header.createDiv({ cls: 'gm-card-title', text: node.name });
+    if (totalItems > 0) {
+      header.createDiv({ cls: 'gm-card-badge', text: String(totalItems) });
+    }
+
+    // 内容区
+    const body = card.createDiv({ cls: 'gm-card-body' });
+
+    if (node.children.length === 0 && node.items.length > 0) {
+      // 叶子节点：显示内容预览
+      this.renderCardBodyContent(body, node.items, 2);
+    } else if (node.children.length > 0) {
+      // 有子目录：显示小卡片网格
+      const smGrid = body.createDiv({ cls: 'gm-cards-sm-grid' });
+      const maxSm = 4;
+      const showChildren = node.children.slice(0, maxSm);
+      const remainingChildren = node.children.length - maxSm;
+
+      showChildren.forEach(child => {
+        this.renderSmallCard(smGrid, child);
+      });
+
+      // "+N 更多" 指示器
+      const totalRemaining = remainingChildren + node.items.length;
+      if (totalRemaining > 0) {
+        const more = smGrid.createDiv({ cls: 'gm-more-card' });
+        more.createSpan({ text: `+${totalRemaining}` });
+      }
+    }
+
+    // 阻止事件冒泡，避免触发大卡片的点击
+    card.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.navigateToNode(node.name);
+    });
+  }
+
+  /**
+   * 渲染小卡片（第三层）
+   */
+  private renderSmallCard(container: HTMLElement, node: TreeNode): void {
+    const card = container.createDiv({ cls: 'gm-card gm-card-sm' });
+    const totalItems = this.countAllItems(node);
+
+    // 头部
+    const header = card.createDiv({ cls: 'gm-card-header' });
+    header.createDiv({ cls: 'gm-card-title', text: node.name });
+    if (totalItems > 0) {
+      header.createDiv({ cls: 'gm-card-badge', text: String(totalItems) });
+    }
+
+    // 内容区
+    const body = card.createDiv({ cls: 'gm-card-body' });
+
+    // 显示预览：子项名称或内容预览
+    const previewText = this.getNodePreviewText(node);
+    if (previewText) {
+      body.createDiv({ cls: 'gm-card-preview', text: previewText });
+    }
+
+    // 阻止事件冒泡
+    card.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.navigateToNode(node.name);
+    });
+  }
+
+  /**
+   * 渲染内容卡片（叶子节点，显示具体文本）
+   */
+  private renderContentCard(container: HTMLElement, item: TreeItem, size: 'lg' | 'md' | 'sm'): void {
+    const card = container.createDiv({ cls: `gm-card gm-card-${size} gm-card-content` });
+
+    // 头部
+    const header = card.createDiv({ cls: 'gm-card-header' });
+    header.createDiv({ cls: 'gm-card-title', text: item.content });
+
+    // 内容区
+    const body = card.createDiv({ cls: 'gm-card-body' });
+
+    if (item.textContent) {
+      const maxLen = size === 'lg' ? 200 : size === 'md' ? 80 : 40;
+      const text = item.textContent.substring(0, maxLen) + (item.textContent.length > maxLen ? '...' : '');
+      body.createDiv({ cls: 'gm-content-text', text });
+    }
+
+    // 来源
+    const source = body.createDiv({ cls: 'gm-content-source' });
+    const link = source.createEl('a', { text: this.getFileName(item.sourceFile) });
+    link.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.app.workspace.openLinkText(item.sourceFile, '', false);
     });
 
-    // 收集内容项
-    node.items.forEach(item => {
-      allItems.push({ name: item.content, isFolder: false });
+    // 点击打开文件
+    card.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.app.workspace.openLinkText(item.sourceFile, '', false);
     });
+  }
 
-    // 显示最多5个，第6个显示 +N
-    const maxShow = 5;
-    const showItems = allItems.slice(0, maxShow);
-    const remaining = allItems.length - maxShow;
+  /**
+   * 在卡片 body 中渲染内容项列表
+   */
+  private renderCardBodyContent(body: HTMLElement, items: TreeItem[], maxItems: number): void {
+    const showItems = items.slice(0, maxItems);
+    const remaining = items.length - maxItems;
 
     showItems.forEach(item => {
-      const dot = preview.createDiv({ cls: 'gm-preview-dot' });
-      dot.textContent = item.name.substring(0, 4);
+      const itemEl = body.createDiv({ cls: 'gm-content-text' });
+      const text = item.textContent ? item.textContent.substring(0, 60) : item.content;
+      itemEl.textContent = text + (item.textContent && item.textContent.length > 60 ? '...' : '');
+      itemEl.style.marginBottom = '6px';
+      itemEl.style.cursor = 'pointer';
+      itemEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.app.workspace.openLinkText(item.sourceFile, '', false);
+      });
     });
 
     if (remaining > 0) {
-      const moreDot = preview.createDiv({ cls: 'gm-preview-dot gm-preview-dot-more' });
-      moreDot.textContent = `+${remaining}`;
+      const more = body.createDiv({ cls: 'gm-content-source' });
+      more.textContent = `+${remaining} 更多内容`;
     }
   }
 
   /**
-   * 展开节点详情（在当前视图下方显示）
+   * 获取节点预览文本
    */
-  private expandNodeDetails(node: TreeNode, type: 'skills' | 'equipment' | 'dungeon', typeIcon: string): void {
-    // 移除已有的展开详情
-    const existing = this.mainContentEl.querySelector('.gm-expanded-details');
-    if (existing) {
-      existing.remove();
-    }
+  private getNodePreviewText(node: TreeNode): string {
+    const parts: string[] = [];
 
-    // 创建展开详情区域
-    const details = this.mainContentEl.createDiv({ cls: 'gm-expanded-details gm-nested-container' });
-    details.style.marginTop = '24px';
-
-    // 标题
-    const header = details.createDiv({ cls: 'gm-container-header' });
-    header.createDiv({ cls: 'gm-container-icon', text: '📂' });
-    header.createDiv({ cls: 'gm-container-title', text: `展开: ${node.name}` });
-    const closeBtn = header.createDiv({ cls: 'gm-container-toggle', text: '✕' });
-    closeBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      details.remove();
+    // 子目录名
+    node.children.slice(0, 2).forEach(child => {
+      parts.push(child.name);
     });
 
-    // 内容区
-    const content = details.createDiv({ cls: 'gm-container-content is-visible' });
-
-    if (node.children.length === 0) {
-      // 只有内容项
-      this.renderLeafItems(content, node.items, typeIcon);
-    } else {
-      // 有子目录，继续渲染嵌套
-      const grid = content.createDiv({ cls: 'gm-nested-grid' });
-      this.renderNestedChildren(grid, node.children, node.items, type, typeIcon);
-    }
-  }
-
-  /**
-   * 渲染叶子节点内容项
-   */
-  private renderLeafItems(container: HTMLElement, items: import('../types').TreeItem[], typeIcon: string): void {
-    if (items.length === 0) {
-      container.createDiv({ cls: 'gm-empty', text: '暂无内容' });
-      return;
-    }
-
-    const grid = container.createDiv({ cls: 'gm-nested-grid' });
-
-    items.forEach(item => {
-      const leaf = grid.createDiv({ cls: 'gm-leaf-item' });
-
-      const header = leaf.createDiv({ cls: 'gm-leaf-header' });
-      header.createDiv({ cls: 'gm-leaf-icon', text: item.isFullFile ? '📄' : typeIcon });
-      header.createDiv({ cls: 'gm-leaf-title', text: item.content });
-      header.createDiv({ cls: 'gm-leaf-source', text: this.getFileName(item.sourceFile) });
-
-      if (item.textContent) {
-        const contentEl = leaf.createDiv({ cls: 'gm-leaf-content' });
-        contentEl.textContent = item.textContent;
-      }
-
-      leaf.addEventListener('click', () => {
-        this.app.workspace.openLinkText(item.sourceFile, '', false);
-      });
+    // 内容项
+    node.items.slice(0, 2).forEach(item => {
+      parts.push(item.content);
     });
+
+    const remaining = node.children.length + node.items.length - parts.length;
+    if (remaining > 0) {
+      parts.push(`+${remaining}`);
+    }
+
+    return parts.join(', ');
   }
 
   /**
-   * 根据路径获取节点（保留用于未来可能的功能）
+   * 导航到指定节点
+   */
+  private navigateToNode(nodeName: string): void {
+    if (this.browseState) {
+      this.browseState.path.push(nodeName);
+      this.renderTab();
+    }
+  }
+
+  /**
+   * 根据路径获取节点
    */
   private getNodeAtPath(tree: TreeNode, path: string[]): TreeNode | null {
     let current = tree;
