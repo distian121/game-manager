@@ -10,11 +10,20 @@ import type GameManagerPlugin from '../main';
 
 type TabType = 'home' | 'skills' | 'equipment' | 'dungeon';
 
+// 当前浏览路径状态
+interface BrowseState {
+  type: 'skills' | 'equipment' | 'dungeon';
+  path: string[];  // 当前路径，如 ['编程', 'python']
+}
+
 export class GameManagerView extends ItemView {
   private plugin: GameManagerPlugin;
   private dataManager: DataManager;
   private activeTab: TabType = 'home';
   private mainContentEl: HTMLElement;
+  
+  // 卡片浏览状态
+  private browseState: BrowseState | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: GameManagerPlugin, dataManager: DataManager) {
     super(leaf);
@@ -88,6 +97,8 @@ export class GameManagerView extends ItemView {
         tabsContainer.querySelectorAll('.gm-tab-btn').forEach(b => b.removeClass('is-active'));
         btn.addClass('is-active');
         this.activeTab = tab.id;
+        // 切换标签页时重置浏览状态
+        this.browseState = null;
         this.renderTab();
       });
     });
@@ -104,13 +115,13 @@ export class GameManagerView extends ItemView {
         this.renderHomeTab();
         break;
       case 'skills':
-        this.renderTreeTab('skills', this.dataManager.getSkillsTree(), '技能', '概念型永久笔记');
+        this.renderCardTab('skills', this.dataManager.getSkillsTree(), '技能', '概念型永久笔记', '⚔️');
         break;
       case 'equipment':
-        this.renderTreeTab('equipment', this.dataManager.getEquipmentTree(), '装备', '方法型永久笔记');
+        this.renderCardTab('equipment', this.dataManager.getEquipmentTree(), '装备', '方法型永久笔记', '🛡️');
         break;
       case 'dungeon':
-        this.renderTreeTab('dungeon', this.dataManager.getDungeonTree(), '副本', '闪念笔记');
+        this.renderCardTab('dungeon', this.dataManager.getDungeonTree(), '副本', '闪念笔记', '🏰');
         break;
     }
   }
@@ -200,9 +211,9 @@ export class GameManagerView extends ItemView {
       const createLink = empty.createEl('a', { text: '创建第一个套装' });
       createLink.addEventListener('click', () => this.createNewSet());
     } else {
-      const treeContainer = section.createDiv({ cls: 'gm-tree-container' });
+      const cardsContainer = section.createDiv({ cls: 'gm-cards-container' });
       sets.forEach(set => {
-        this.renderSetItem(treeContainer, set);
+        this.renderSetCard(cardsContainer, set);
       });
 
       // 添加新建按钮
@@ -216,17 +227,20 @@ export class GameManagerView extends ItemView {
   }
 
   /**
-   * 渲染单个套装项
+   * 渲染单个套装卡片
    */
-  private renderSetItem(container: HTMLElement, set: GameSet): void {
-    const node = container.createDiv({ cls: 'gm-tree-node' });
-    const header = node.createDiv({ cls: 'gm-tree-header' });
+  private renderSetCard(container: HTMLElement, set: GameSet): void {
+    const card = container.createDiv({ cls: 'gm-card' });
 
-    header.createSpan({ cls: 'gm-tree-toggle-placeholder', text: '📁' });
-    header.createSpan({ cls: 'gm-tree-label', text: set.name });
-    header.createSpan({ cls: 'gm-tree-badge', text: String(set.linkedItems.length) });
+    card.createDiv({ cls: 'gm-card-icon', text: '👑' });
+    card.createDiv({ cls: 'gm-card-title', text: set.name });
+    card.createDiv({ cls: 'gm-card-count', text: `${set.linkedItems.length} 个关联` });
 
-    header.addEventListener('click', () => {
+    if (set.linkedItems.length > 0) {
+      card.createDiv({ cls: 'gm-card-badge', text: String(set.linkedItems.length) });
+    }
+
+    card.addEventListener('click', () => {
       // 打开套装文件
       const file = this.app.vault.getAbstractFileByPath(set.filePath);
       if (file) {
@@ -285,108 +299,196 @@ export class GameManagerView extends ItemView {
   }
 
   /**
-   * 渲染树形标签页（技能/装备/副本）
+   * 渲染卡片式标签页（技能/装备/副本）
    */
-  private renderTreeTab(type: string, tree: TreeNode, title: string, desc: string): void {
-    this.mainContentEl.createEl('h3', { text: `📂 ${title}` });
+  private renderCardTab(type: 'skills' | 'equipment' | 'dungeon', tree: TreeNode, title: string, desc: string, icon: string): void {
+    // 初始化浏览状态
+    if (!this.browseState || this.browseState.type !== type) {
+      this.browseState = { type, path: [] };
+    }
+
+    // 获取当前路径对应的节点
+    const currentNode = this.getNodeAtPath(tree, this.browseState.path);
+
+    // 标题
+    this.mainContentEl.createEl('h3', { text: `${icon} ${title}` });
     this.mainContentEl.createEl('p', { text: desc, cls: 'gm-panel-desc' });
 
-    if (tree.children.length === 0) {
+    // 面包屑导航
+    if (this.browseState.path.length > 0) {
+      this.renderBreadcrumb(type, title, icon);
+    }
+
+    // 判断当前节点状态
+    if (!currentNode || (currentNode.children.length === 0 && currentNode.items.length === 0)) {
+      // 空状态
       const empty = this.mainContentEl.createDiv({ cls: 'gm-empty' });
-      empty.textContent = `暂无${title}数据，在笔记中使用 #${type}-分类-内容 添加`;
+      if (this.browseState.path.length === 0) {
+        empty.textContent = `暂无${title}数据，在笔记中使用 #${type === 'skills' ? 'skill' : type === 'equipment' ? 'equip' : 'dungeon'}-分类-内容 添加`;
+      } else {
+        empty.textContent = '此分类下暂无内容';
+      }
       return;
     }
 
-    // 渲染树结构
-    const treeContainer = this.mainContentEl.createDiv({ cls: 'gm-tree-container' });
-    this.renderTreeNodes(treeContainer, tree.children);
+    // 如果有子目录，显示卡片
+    if (currentNode.children.length > 0) {
+      this.renderCards(currentNode.children, type);
+    }
+
+    // 如果有内容项，显示内容列表
+    if (currentNode.items.length > 0) {
+      this.renderContentItems(currentNode);
+    }
   }
 
   /**
-   * 渲染树节点列表
+   * 渲染面包屑导航
    */
-  private renderTreeNodes(container: HTMLElement, nodes: TreeNode[]): void {
+  private renderBreadcrumb(type: 'skills' | 'equipment' | 'dungeon', title: string, icon: string): void {
+    const breadcrumb = this.mainContentEl.createDiv({ cls: 'gm-breadcrumb' });
+
+    // 返回按钮
+    const backBtn = breadcrumb.createEl('button', { cls: 'gm-back-btn' });
+    backBtn.createSpan({ text: '← 返回' });
+    backBtn.addEventListener('click', () => {
+      if (this.browseState && this.browseState.path.length > 0) {
+        this.browseState.path.pop();
+        this.renderTab();
+      }
+    });
+
+    // 根节点
+    const rootItem = breadcrumb.createSpan({ cls: 'gm-breadcrumb-item', text: `${icon} ${title}` });
+    rootItem.addEventListener('click', () => {
+      if (this.browseState) {
+        this.browseState.path = [];
+        this.renderTab();
+      }
+    });
+
+    // 路径节点
+    if (this.browseState) {
+      this.browseState.path.forEach((segment, index) => {
+        breadcrumb.createSpan({ cls: 'gm-breadcrumb-sep', text: '›' });
+
+        if (index === this.browseState!.path.length - 1) {
+          // 当前节点
+          breadcrumb.createSpan({ cls: 'gm-breadcrumb-current', text: segment });
+        } else {
+          // 可点击的父节点
+          const item = breadcrumb.createSpan({ cls: 'gm-breadcrumb-item', text: segment });
+          item.addEventListener('click', () => {
+            if (this.browseState) {
+              this.browseState.path = this.browseState.path.slice(0, index + 1);
+              this.renderTab();
+            }
+          });
+        }
+      });
+    }
+  }
+
+  /**
+   * 渲染卡片列表
+   */
+  private renderCards(nodes: TreeNode[], type: 'skills' | 'equipment' | 'dungeon'): void {
+    const cardsContainer = this.mainContentEl.createDiv({ cls: 'gm-cards-container' });
+
+    // 根据类型选择图标
+    const getIcon = (hasChildren: boolean): string => {
+      if (hasChildren) {
+        return '📁';
+      }
+      switch (type) {
+        case 'skills': return '⚔️';
+        case 'equipment': return '🛡️';
+        case 'dungeon': return '🏰';
+      }
+    };
+
     nodes.forEach(node => {
-      this.renderTreeNode(container, node);
+      const card = cardsContainer.createDiv({ cls: 'gm-card' });
+
+      const hasChildren = node.children.length > 0;
+      const totalItems = this.countAllItems(node);
+
+      // 图标
+      card.createDiv({ cls: 'gm-card-icon', text: getIcon(hasChildren) });
+
+      // 标题
+      card.createDiv({ cls: 'gm-card-title', text: node.name });
+
+      // 计数
+      if (hasChildren) {
+        card.createDiv({ cls: 'gm-card-count', text: `${node.children.length} 个分类` });
+      } else if (node.items.length > 0) {
+        card.createDiv({ cls: 'gm-card-count', text: `${node.items.length} 条内容` });
+      }
+
+      // 徽章
+      if (totalItems > 0) {
+        card.createDiv({ cls: 'gm-card-badge', text: String(totalItems) });
+      }
+
+      // 点击进入下一级
+      card.addEventListener('click', () => {
+        if (this.browseState) {
+          this.browseState.path.push(node.name);
+          this.renderTab();
+        }
+      });
     });
   }
 
   /**
-   * 渲染单个树节点
+   * 渲染内容项列表
    */
-  private renderTreeNode(container: HTMLElement, node: TreeNode): void {
-    const nodeEl = container.createDiv({ cls: 'gm-tree-node' });
-    const header = nodeEl.createDiv({ cls: 'gm-tree-header' });
+  private renderContentItems(node: TreeNode): void {
+    if (node.items.length === 0) return;
 
-    const hasChildren = node.children.length > 0;
-    const hasItems = node.items.length > 0;
-    let isExpanded = false;
+    const section = this.mainContentEl.createDiv({ cls: 'gm-section' });
+    section.createEl('h4', { text: `📝 内容 (${node.items.length})` });
 
-    // 展开/折叠按钮
-    const toggle = header.createSpan({
-      cls: hasChildren ? 'gm-tree-toggle' : 'gm-tree-toggle-placeholder',
-      text: hasChildren ? '▶' : '•',
+    const contentList = section.createDiv({ cls: 'gm-content-list' });
+
+    node.items.forEach(item => {
+      const contentItem = contentList.createDiv({ cls: 'gm-content-item' });
+
+      // 内容文本
+      contentItem.createSpan({ cls: 'gm-content-text', text: item.content });
+
+      // 来源信息
+      const sourceEl = contentItem.createDiv({ cls: 'gm-content-source' });
+
+      const link = sourceEl.createEl('a', {
+        cls: 'gm-content-link',
+        text: this.getFileName(item.sourceFile),
+      });
+      link.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.app.workspace.openLinkText(item.sourceFile, '', false);
+      });
+
+      sourceEl.createSpan({ cls: 'gm-content-line', text: `L${item.lineNumber}` });
     });
+  }
 
-    // 节点标签
-    header.createSpan({ cls: 'gm-tree-label', text: node.name });
+  /**
+   * 根据路径获取节点
+   */
+  private getNodeAtPath(tree: TreeNode, path: string[]): TreeNode | null {
+    let current = tree;
 
-    // 徽章（项数）
-    const totalItems = this.countAllItems(node);
-    if (totalItems > 0) {
-      header.createSpan({ cls: 'gm-tree-badge', text: String(totalItems) });
+    for (const segment of path) {
+      const child = current.children.find(c => c.name === segment);
+      if (!child) {
+        return null;
+      }
+      current = child;
     }
 
-    // 子节点数量
-    if (hasChildren) {
-      header.createSpan({ cls: 'gm-tree-child-count', text: `(${node.children.length} 个分类)` });
-    }
-
-    // 子节点容器
-    let childrenContainer: HTMLElement | null = null;
-    let sourcesContainer: HTMLElement | null = null;
-
-    if (hasChildren || hasItems) {
-      childrenContainer = nodeEl.createDiv({ cls: 'gm-tree-children' });
-      childrenContainer.style.display = 'none';
-
-      // 渲染来源（叶子节点的项）
-      if (hasItems) {
-        sourcesContainer = childrenContainer.createDiv({ cls: 'gm-tree-sources' });
-        node.items.forEach(item => {
-          const sourceItem = sourcesContainer!.createDiv({ cls: 'gm-source-item' });
-          
-          const link = sourceItem.createEl('a', {
-            cls: 'gm-source-link',
-            text: this.getFileName(item.sourceFile),
-          });
-          link.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.app.workspace.openLinkText(item.sourceFile, '', false);
-          });
-
-          sourceItem.createSpan({ cls: 'gm-source-line', text: `L${item.lineNumber}` });
-        });
-      }
-
-      // 渲染子节点
-      if (hasChildren) {
-        this.renderTreeNodes(childrenContainer, node.children);
-      }
-    }
-
-    // 点击展开/折叠
-    header.addEventListener('click', () => {
-      if (!childrenContainer) return;
-
-      isExpanded = !isExpanded;
-      childrenContainer.style.display = isExpanded ? 'block' : 'none';
-
-      if (hasChildren) {
-        toggle.textContent = isExpanded ? '▼' : '▶';
-        toggle.toggleClass('is-expanded', isExpanded);
-      }
-    });
+    return current;
   }
 
   /**

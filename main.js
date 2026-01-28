@@ -417,6 +417,8 @@ var GameManagerView = class extends import_obsidian.ItemView {
   constructor(leaf, plugin, dataManager) {
     super(leaf);
     this.activeTab = "home";
+    // 卡片浏览状态
+    this.browseState = null;
     this.plugin = plugin;
     this.dataManager = dataManager;
   }
@@ -468,6 +470,7 @@ var GameManagerView = class extends import_obsidian.ItemView {
         tabsContainer.querySelectorAll(".gm-tab-btn").forEach((b) => b.removeClass("is-active"));
         btn.addClass("is-active");
         this.activeTab = tab.id;
+        this.browseState = null;
         this.renderTab();
       });
     });
@@ -482,13 +485,13 @@ var GameManagerView = class extends import_obsidian.ItemView {
         this.renderHomeTab();
         break;
       case "skills":
-        this.renderTreeTab("skills", this.dataManager.getSkillsTree(), "\u6280\u80FD", "\u6982\u5FF5\u578B\u6C38\u4E45\u7B14\u8BB0");
+        this.renderCardTab("skills", this.dataManager.getSkillsTree(), "\u6280\u80FD", "\u6982\u5FF5\u578B\u6C38\u4E45\u7B14\u8BB0", "\u2694\uFE0F");
         break;
       case "equipment":
-        this.renderTreeTab("equipment", this.dataManager.getEquipmentTree(), "\u88C5\u5907", "\u65B9\u6CD5\u578B\u6C38\u4E45\u7B14\u8BB0");
+        this.renderCardTab("equipment", this.dataManager.getEquipmentTree(), "\u88C5\u5907", "\u65B9\u6CD5\u578B\u6C38\u4E45\u7B14\u8BB0", "\u{1F6E1}\uFE0F");
         break;
       case "dungeon":
-        this.renderTreeTab("dungeon", this.dataManager.getDungeonTree(), "\u526F\u672C", "\u95EA\u5FF5\u7B14\u8BB0");
+        this.renderCardTab("dungeon", this.dataManager.getDungeonTree(), "\u526F\u672C", "\u95EA\u5FF5\u7B14\u8BB0", "\u{1F3F0}");
         break;
     }
   }
@@ -558,9 +561,9 @@ var GameManagerView = class extends import_obsidian.ItemView {
       const createLink = empty.createEl("a", { text: "\u521B\u5EFA\u7B2C\u4E00\u4E2A\u5957\u88C5" });
       createLink.addEventListener("click", () => this.createNewSet());
     } else {
-      const treeContainer = section.createDiv({ cls: "gm-tree-container" });
+      const cardsContainer = section.createDiv({ cls: "gm-cards-container" });
       sets.forEach((set) => {
-        this.renderSetItem(treeContainer, set);
+        this.renderSetCard(cardsContainer, set);
       });
       const addBtn = section.createEl("button", {
         cls: "gm-btn",
@@ -571,15 +574,17 @@ var GameManagerView = class extends import_obsidian.ItemView {
     }
   }
   /**
-   * 渲染单个套装项
+   * 渲染单个套装卡片
    */
-  renderSetItem(container, set) {
-    const node = container.createDiv({ cls: "gm-tree-node" });
-    const header = node.createDiv({ cls: "gm-tree-header" });
-    header.createSpan({ cls: "gm-tree-toggle-placeholder", text: "\u{1F4C1}" });
-    header.createSpan({ cls: "gm-tree-label", text: set.name });
-    header.createSpan({ cls: "gm-tree-badge", text: String(set.linkedItems.length) });
-    header.addEventListener("click", () => {
+  renderSetCard(container, set) {
+    const card = container.createDiv({ cls: "gm-card" });
+    card.createDiv({ cls: "gm-card-icon", text: "\u{1F451}" });
+    card.createDiv({ cls: "gm-card-title", text: set.name });
+    card.createDiv({ cls: "gm-card-count", text: `${set.linkedItems.length} \u4E2A\u5173\u8054` });
+    if (set.linkedItems.length > 0) {
+      card.createDiv({ cls: "gm-card-badge", text: String(set.linkedItems.length) });
+    }
+    card.addEventListener("click", () => {
       const file = this.app.vault.getAbstractFileByPath(set.filePath);
       if (file) {
         this.app.workspace.openLinkText(set.filePath, "", false);
@@ -629,82 +634,148 @@ var GameManagerView = class extends import_obsidian.ItemView {
     });
   }
   /**
-   * 渲染树形标签页（技能/装备/副本）
+   * 渲染卡片式标签页（技能/装备/副本）
    */
-  renderTreeTab(type, tree, title, desc) {
-    this.mainContentEl.createEl("h3", { text: `\u{1F4C2} ${title}` });
+  renderCardTab(type, tree, title, desc, icon) {
+    if (!this.browseState || this.browseState.type !== type) {
+      this.browseState = { type, path: [] };
+    }
+    const currentNode = this.getNodeAtPath(tree, this.browseState.path);
+    this.mainContentEl.createEl("h3", { text: `${icon} ${title}` });
     this.mainContentEl.createEl("p", { text: desc, cls: "gm-panel-desc" });
-    if (tree.children.length === 0) {
+    if (this.browseState.path.length > 0) {
+      this.renderBreadcrumb(type, title, icon);
+    }
+    if (!currentNode || currentNode.children.length === 0 && currentNode.items.length === 0) {
       const empty = this.mainContentEl.createDiv({ cls: "gm-empty" });
-      empty.textContent = `\u6682\u65E0${title}\u6570\u636E\uFF0C\u5728\u7B14\u8BB0\u4E2D\u4F7F\u7528 #${type}-\u5206\u7C7B-\u5185\u5BB9 \u6DFB\u52A0`;
+      if (this.browseState.path.length === 0) {
+        empty.textContent = `\u6682\u65E0${title}\u6570\u636E\uFF0C\u5728\u7B14\u8BB0\u4E2D\u4F7F\u7528 #${type === "skills" ? "skill" : type === "equipment" ? "equip" : "dungeon"}-\u5206\u7C7B-\u5185\u5BB9 \u6DFB\u52A0`;
+      } else {
+        empty.textContent = "\u6B64\u5206\u7C7B\u4E0B\u6682\u65E0\u5185\u5BB9";
+      }
       return;
     }
-    const treeContainer = this.mainContentEl.createDiv({ cls: "gm-tree-container" });
-    this.renderTreeNodes(treeContainer, tree.children);
+    if (currentNode.children.length > 0) {
+      this.renderCards(currentNode.children, type);
+    }
+    if (currentNode.items.length > 0) {
+      this.renderContentItems(currentNode);
+    }
   }
   /**
-   * 渲染树节点列表
+   * 渲染面包屑导航
    */
-  renderTreeNodes(container, nodes) {
+  renderBreadcrumb(type, title, icon) {
+    const breadcrumb = this.mainContentEl.createDiv({ cls: "gm-breadcrumb" });
+    const backBtn = breadcrumb.createEl("button", { cls: "gm-back-btn" });
+    backBtn.createSpan({ text: "\u2190 \u8FD4\u56DE" });
+    backBtn.addEventListener("click", () => {
+      if (this.browseState && this.browseState.path.length > 0) {
+        this.browseState.path.pop();
+        this.renderTab();
+      }
+    });
+    const rootItem = breadcrumb.createSpan({ cls: "gm-breadcrumb-item", text: `${icon} ${title}` });
+    rootItem.addEventListener("click", () => {
+      if (this.browseState) {
+        this.browseState.path = [];
+        this.renderTab();
+      }
+    });
+    if (this.browseState) {
+      this.browseState.path.forEach((segment, index) => {
+        breadcrumb.createSpan({ cls: "gm-breadcrumb-sep", text: "\u203A" });
+        if (index === this.browseState.path.length - 1) {
+          breadcrumb.createSpan({ cls: "gm-breadcrumb-current", text: segment });
+        } else {
+          const item = breadcrumb.createSpan({ cls: "gm-breadcrumb-item", text: segment });
+          item.addEventListener("click", () => {
+            if (this.browseState) {
+              this.browseState.path = this.browseState.path.slice(0, index + 1);
+              this.renderTab();
+            }
+          });
+        }
+      });
+    }
+  }
+  /**
+   * 渲染卡片列表
+   */
+  renderCards(nodes, type) {
+    const cardsContainer = this.mainContentEl.createDiv({ cls: "gm-cards-container" });
+    const getIcon = (hasChildren) => {
+      if (hasChildren) {
+        return "\u{1F4C1}";
+      }
+      switch (type) {
+        case "skills":
+          return "\u2694\uFE0F";
+        case "equipment":
+          return "\u{1F6E1}\uFE0F";
+        case "dungeon":
+          return "\u{1F3F0}";
+      }
+    };
     nodes.forEach((node) => {
-      this.renderTreeNode(container, node);
+      const card = cardsContainer.createDiv({ cls: "gm-card" });
+      const hasChildren = node.children.length > 0;
+      const totalItems = this.countAllItems(node);
+      card.createDiv({ cls: "gm-card-icon", text: getIcon(hasChildren) });
+      card.createDiv({ cls: "gm-card-title", text: node.name });
+      if (hasChildren) {
+        card.createDiv({ cls: "gm-card-count", text: `${node.children.length} \u4E2A\u5206\u7C7B` });
+      } else if (node.items.length > 0) {
+        card.createDiv({ cls: "gm-card-count", text: `${node.items.length} \u6761\u5185\u5BB9` });
+      }
+      if (totalItems > 0) {
+        card.createDiv({ cls: "gm-card-badge", text: String(totalItems) });
+      }
+      card.addEventListener("click", () => {
+        if (this.browseState) {
+          this.browseState.path.push(node.name);
+          this.renderTab();
+        }
+      });
     });
   }
   /**
-   * 渲染单个树节点
+   * 渲染内容项列表
    */
-  renderTreeNode(container, node) {
-    const nodeEl = container.createDiv({ cls: "gm-tree-node" });
-    const header = nodeEl.createDiv({ cls: "gm-tree-header" });
-    const hasChildren = node.children.length > 0;
-    const hasItems = node.items.length > 0;
-    let isExpanded = false;
-    const toggle = header.createSpan({
-      cls: hasChildren ? "gm-tree-toggle" : "gm-tree-toggle-placeholder",
-      text: hasChildren ? "\u25B6" : "\u2022"
+  renderContentItems(node) {
+    if (node.items.length === 0)
+      return;
+    const section = this.mainContentEl.createDiv({ cls: "gm-section" });
+    section.createEl("h4", { text: `\u{1F4DD} \u5185\u5BB9 (${node.items.length})` });
+    const contentList = section.createDiv({ cls: "gm-content-list" });
+    node.items.forEach((item) => {
+      const contentItem = contentList.createDiv({ cls: "gm-content-item" });
+      contentItem.createSpan({ cls: "gm-content-text", text: item.content });
+      const sourceEl = contentItem.createDiv({ cls: "gm-content-source" });
+      const link = sourceEl.createEl("a", {
+        cls: "gm-content-link",
+        text: this.getFileName(item.sourceFile)
+      });
+      link.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.app.workspace.openLinkText(item.sourceFile, "", false);
+      });
+      sourceEl.createSpan({ cls: "gm-content-line", text: `L${item.lineNumber}` });
     });
-    header.createSpan({ cls: "gm-tree-label", text: node.name });
-    const totalItems = this.countAllItems(node);
-    if (totalItems > 0) {
-      header.createSpan({ cls: "gm-tree-badge", text: String(totalItems) });
-    }
-    if (hasChildren) {
-      header.createSpan({ cls: "gm-tree-child-count", text: `(${node.children.length} \u4E2A\u5206\u7C7B)` });
-    }
-    let childrenContainer = null;
-    let sourcesContainer = null;
-    if (hasChildren || hasItems) {
-      childrenContainer = nodeEl.createDiv({ cls: "gm-tree-children" });
-      childrenContainer.style.display = "none";
-      if (hasItems) {
-        sourcesContainer = childrenContainer.createDiv({ cls: "gm-tree-sources" });
-        node.items.forEach((item) => {
-          const sourceItem = sourcesContainer.createDiv({ cls: "gm-source-item" });
-          const link = sourceItem.createEl("a", {
-            cls: "gm-source-link",
-            text: this.getFileName(item.sourceFile)
-          });
-          link.addEventListener("click", (e) => {
-            e.stopPropagation();
-            this.app.workspace.openLinkText(item.sourceFile, "", false);
-          });
-          sourceItem.createSpan({ cls: "gm-source-line", text: `L${item.lineNumber}` });
-        });
+  }
+  /**
+   * 根据路径获取节点
+   */
+  getNodeAtPath(tree, path) {
+    let current = tree;
+    for (const segment of path) {
+      const child = current.children.find((c) => c.name === segment);
+      if (!child) {
+        return null;
       }
-      if (hasChildren) {
-        this.renderTreeNodes(childrenContainer, node.children);
-      }
+      current = child;
     }
-    header.addEventListener("click", () => {
-      if (!childrenContainer)
-        return;
-      isExpanded = !isExpanded;
-      childrenContainer.style.display = isExpanded ? "block" : "none";
-      if (hasChildren) {
-        toggle.textContent = isExpanded ? "\u25BC" : "\u25B6";
-        toggle.toggleClass("is-expanded", isExpanded);
-      }
-    });
+    return current;
   }
   /**
    * 统计节点下所有项数
