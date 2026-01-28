@@ -1,0 +1,311 @@
+/* Game Manager Plugin Styles */
+
+.game-manager-view {
+  padding: 10px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* ===== 主标签栏 ===== */
+.gm-main-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.gm-tab-btn {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.gm-tab-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.gm-tab-btn.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* ===== 内容区域 ===== */
+.gm-content {
+  padding: 0 4px;
+}
+
+.gm-content h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  color: var(--text-normal);
+}
+
+.gm-panel-desc {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0 0 16px 0;
+}
+
+.gm-section {
+  margin-bottom: 24px;
+}
+
+.gm-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+}
+
+/* ===== 统计卡片 ===== */
+.gm-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.gm-stat-card {
+  background: var(--background-secondary);
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.gm-stat-card:hover {
+  background: var(--background-modifier-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.gm-stat-card-warning {
+  border-color: var(--text-warning);
+}
+
+.gm-stat-icon {
+  font-size: 24px;
+  margin-bottom: 6px;
+}
+
+.gm-stat-number {
+  font-size: 28px;
+  font-weight: bold;
+  color: var(--interactive-accent);
+}
+
+.gm-stat-label {
+  font-size: 12px;
+  color: var(--text-normal);
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.gm-stat-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ===== 操作按钮 ===== */
+.gm-actions {
+  margin: 20px 0;
+}
+
+.gm-btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.gm-btn-primary {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.gm-btn-primary:hover {
+  filter: brightness(1.1);
+}
+
+/* ===== 帮助区域 ===== */
+.gm-help {
+  background: var(--background-secondary);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 20px;
+}
+
+.gm-help h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+}
+
+.gm-examples {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gm-example {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gm-tag {
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  background: var(--background-primary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: var(--text-accent);
+}
+
+.gm-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.gm-tip {
+  margin: 12px 0 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 8px;
+  background: var(--background-primary);
+  border-radius: 4px;
+  border-left: 3px solid var(--interactive-accent);
+}
+
+/* ===== 树状结构 ===== */
+.gm-tree-container {
+  font-size: 13px;
+}
+
+.gm-tree-node {
+  margin: 2px 0;
+}
+
+.gm-tree-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.gm-tree-header:hover {
+  background: var(--background-modifier-hover);
+}
+
+.gm-tree-toggle {
+  font-size: 10px;
+  color: var(--text-muted);
+  width: 12px;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.gm-tree-toggle.is-expanded {
+  color: var(--text-normal);
+}
+
+.gm-tree-toggle-placeholder {
+  width: 12px;
+  text-align: center;
+  color: var(--text-faint);
+}
+
+.gm-tree-label {
+  font-weight: 500;
+  color: var(--text-normal);
+  flex: 1;
+}
+
+.gm-tree-badge {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.gm-tree-child-count {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.gm-tree-sources {
+  margin: 4px 0 8px 0;
+}
+
+.gm-source-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.gm-source-link {
+  color: var(--text-accent);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.gm-source-link:hover {
+  text-decoration: underline;
+}
+
+.gm-source-line {
+  color: var(--text-faint);
+  font-size: 11px;
+  font-family: var(--font-monospace);
+}
+
+.gm-tree-children {
+  border-left: 1px dashed var(--background-modifier-border);
+  margin-left: 6px;
+}
+
+/* ===== 空状态 ===== */
+.gm-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* ===== 滚动条美化 ===== */
+.game-manager-view::-webkit-scrollbar {
+  width: 8px;
+}
+
+.game-manager-view::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.game-manager-view::-webkit-scrollbar-thumb {
+  background: var(--background-modifier-border);
+  border-radius: 4px;
+}
+
+.game-manager-view::-webkit-scrollbar-thumb:hover {
+  background: var(--background-modifier-border-hover);
+}
+

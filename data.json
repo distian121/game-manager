@@ -1,0 +1,31 @@
+{
+  "skills": {
+    "测试": [
+      {
+        "content": "测试",
+        "sourceFile": "欢迎.md",
+        "position": 0,
+        "line": 7,
+        "tag": "#skill-测试-测试"
+      },
+      {
+        "content": "文章",
+        "sourceFile": "欢迎.md",
+        "position": 0,
+        "line": 13,
+        "tag": "#skill-测试-文章"
+      }
+    ],
+    "文章": [
+      {
+        "content": "测试",
+        "sourceFile": "欢迎.md",
+        "position": 0,
+        "line": 11,
+        "tag": "#skill-文章-测试"
+      }
+    ]
+  },
+  "equipment": {},
+  "dungeon": {}
+}

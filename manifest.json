@@ -1,0 +1,10 @@
+{
+  "id": "game-manager",
+  "name": "Game Manager",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "description": "管理你的技能、装备和副本数据，通过标签自动收集并双向链接",
+  "author": "User",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}
