@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": 0,
+  "skills": {
+    "name": "root",
+    "path": [],
+    "children": [],
+    "items": [],
+    "isLeaf": false
+  },
+  "equipment": {
+    "name": "root",
+    "path": [],
+    "children": [],
+    "items": [],
+    "isLeaf": false
+  },
+  "dungeon": {
+    "name": "root",
+    "path": [],
+    "children": [],
+    "items": [],
+    "isLeaf": false
+  },
+  "sets": [],
+  "fileIndex": {}
+}

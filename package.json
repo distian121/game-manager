@@ -1,0 +1,25 @@
+{
+  "name": "game-manager",
+  "version": "1.0.0",
+  "description": "用游戏术语实现知识卡片管理的卡片盒笔记法 Obsidian 插件",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "node esbuild.config.mjs production"
+  },
+  "keywords": [
+    "obsidian",
+    "plugin",
+    "zettelkasten",
+    "game",
+    "knowledge-management"
+  ],
+  "author": "",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "esbuild": "^0.19.0",
+    "obsidian": "^1.4.0",
+    "typescript": "^5.3.0"
+  }
+}
