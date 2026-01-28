@@ -448,23 +448,26 @@ export class GameManagerView extends ItemView {
   }
 
   /**
-   * 渲染文件夹卡片（透明容器，内部预览子卡片）
+   * 渲染文件夹卡片（全宽透明容器，内部预览子卡片和内容）
    */
   private renderFolderCard(container: HTMLElement, node: TreeNode, type: 'skills' | 'equipment' | 'dungeon', typeIcon: string): void {
     const folder = container.createDiv({ cls: 'gm-folder-card' });
 
     const totalItems = this.countAllItems(node);
 
-    // 徽章
+    // 头部：图标 + 标题 + 徽章
+    const header = folder.createDiv({ cls: 'gm-folder-header' });
+    header.createDiv({ cls: 'gm-folder-icon', text: '📁' });
+    header.createDiv({ cls: 'gm-folder-title', text: node.name });
     if (totalItems > 0) {
-      folder.createDiv({ cls: 'gm-folder-badge', text: String(totalItems) });
+      header.createDiv({ cls: 'gm-folder-badge', text: String(totalItems) });
     }
 
-    // 预览网格（显示前4个子项）
+    // 预览网格（显示所有子项，最多8个）
     const preview = folder.createDiv({ cls: 'gm-folder-preview' });
-    const previewItems = this.getPreviewItems(node, 4);
+    const previewItems = this.getPreviewItems(node, 8);
 
-    previewItems.forEach((item, index) => {
+    previewItems.forEach((item) => {
       const miniCard = preview.createDiv({ cls: 'gm-mini-card' });
 
       if (item.type === 'more') {
@@ -476,15 +479,15 @@ export class GameManagerView extends ItemView {
       }
     });
 
-    // 填充空位
-    const emptySlots = 4 - previewItems.length;
-    for (let i = 0; i < emptySlots; i++) {
-      const emptyCard = preview.createDiv({ cls: 'gm-mini-card' });
-      emptyCard.style.visibility = 'hidden';
+    // 如果有内容项，显示内容预览
+    if (node.items.length > 0) {
+      const firstItem = node.items[0];
+      if (firstItem.textContent) {
+        const contentPreview = folder.createDiv({ cls: 'gm-content-preview' });
+        contentPreview.textContent = firstItem.textContent.substring(0, 200) + 
+          (firstItem.textContent.length > 200 ? '...' : '');
+      }
     }
-
-    // 文件夹标题
-    folder.createDiv({ cls: 'gm-folder-title', text: node.name });
 
     // 点击进入
     folder.addEventListener('click', () => {
@@ -567,7 +570,7 @@ export class GameManagerView extends ItemView {
   }
 
   /**
-   * 渲染内容项列表
+   * 渲染内容项列表（全宽卡片，显示文本预览）
    */
   private renderContentItems(node: TreeNode): void {
     if (node.items.length === 0) return;
@@ -578,14 +581,17 @@ export class GameManagerView extends ItemView {
     const contentList = section.createDiv({ cls: 'gm-content-list' });
 
     node.items.forEach(item => {
-      const contentItem = contentList.createDiv({ cls: 'gm-content-item' });
+      const contentCard = contentList.createDiv({ cls: 'gm-folder-card' });
 
-      // 内容文本
-      contentItem.createSpan({ cls: 'gm-content-text', text: item.content });
+      // 头部
+      const header = contentCard.createDiv({ cls: 'gm-folder-header' });
+      header.createDiv({ cls: 'gm-folder-icon', text: item.isFullFile ? '📄' : '📝' });
+      
+      const titleEl = header.createDiv({ cls: 'gm-folder-title' });
+      titleEl.textContent = item.isFullFile ? `整个文件: ${this.getFileName(item.sourceFile)}` : item.content;
 
-      // 来源信息
-      const sourceEl = contentItem.createDiv({ cls: 'gm-content-source' });
-
+      // 来源链接
+      const sourceEl = header.createDiv({ cls: 'gm-content-source' });
       const link = sourceEl.createEl('a', {
         cls: 'gm-content-link',
         text: this.getFileName(item.sourceFile),
@@ -594,8 +600,18 @@ export class GameManagerView extends ItemView {
         e.stopPropagation();
         this.app.workspace.openLinkText(item.sourceFile, '', false);
       });
-
       sourceEl.createSpan({ cls: 'gm-content-line', text: `L${item.lineNumber}` });
+
+      // 文本内容预览
+      if (item.textContent) {
+        const contentPreview = contentCard.createDiv({ cls: 'gm-content-preview' });
+        contentPreview.textContent = item.textContent;
+      }
+
+      // 点击打开文件
+      contentCard.addEventListener('click', () => {
+        this.app.workspace.openLinkText(item.sourceFile, '', false);
+      });
     });
   }
 

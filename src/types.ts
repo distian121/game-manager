@@ -20,6 +20,8 @@ export interface TreeItem {
   sourceFile: string;     // 来源文件路径
   lineNumber: number;     // 所在行号
   fullTag: string;        // 完整标签字符串
+  textContent?: string;   // 标签关联的文本内容（文件开头=全文，文中=到空行）
+  isFullFile?: boolean;   // 是否代表整个文件
 }
 
 // 解析后的标签
@@ -30,6 +32,8 @@ export interface ParsedTag {
   sourceFile: string;     // 来源文件
   lineNumber: number;     // 行号
   fullTag: string;        // 完整原始标签
+  textContent?: string;   // 标签关联的文本内容
+  isFullFile?: boolean;   // 是否代表整个文件（标签在文件开头）
 }
 
 // 套装定义

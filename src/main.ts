@@ -104,7 +104,7 @@ export default class GameManagerPlugin extends Plugin {
   }
 
   /**
-   * 激活视图（在侧边栏打开）
+   * 激活视图（在主编辑区打开）
    */
   async activateView(): Promise<void> {
     const { workspace } = this.app;
@@ -116,8 +116,8 @@ export default class GameManagerPlugin extends Plugin {
       // 视图已存在，激活它
       leaf = leaves[0];
     } else {
-      // 创建新视图
-      leaf = workspace.getRightLeaf(false);
+      // 在主编辑区创建新标签页
+      leaf = workspace.getLeaf('tab');
       if (leaf) {
         await leaf.setViewState({
           type: VIEW_TYPE_GAME_MANAGER,

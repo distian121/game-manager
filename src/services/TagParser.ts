@@ -1,7 +1,10 @@
 /**
  * 标签解析服务
  * 解析 #skill-a-b-c-xxx、#equip-a-b-xxx、#dungeon-a-xxx 格式的标签
- * 规则：最后一项为内容，前面所有项（除类型外）为分类路径
+ * 规则：
+ * - 最后一项为内容，前面所有项（除类型外）为分类路径
+ * - 如果标签在文件开头（前几行），表示整个文件都是该类型
+ * - 如果标签在文中，表示从标签下一行到下一个空行的内容
  */
 
 import { ParsedTag, TagType } from '../types';
@@ -16,6 +19,52 @@ const TAG_PREFIXES: Record<string, TagType> = {
 
 // 标签匹配正则：#type-xxx-xxx-xxx（至少有类型和一个内容）
 const TAG_REGEX = /#(skill|equip|dungeon|set)(-[a-zA-Z0-9\u4e00-\u9fa5_]+)+/g;
+
+/**
+ * 判断标签是否在文件开头（前3行非空行内）
+ */
+function isAtFileStart(lines: string[], lineIndex: number): boolean {
+  let nonEmptyCount = 0;
+  for (let i = 0; i <= lineIndex && i < lines.length; i++) {
+    if (lines[i].trim() !== '') {
+      nonEmptyCount++;
+    }
+  }
+  return nonEmptyCount <= 3;
+}
+
+/**
+ * 获取标签关联的文本内容
+ * @param lines 文件所有行
+ * @param tagLineIndex 标签所在行索引
+ * @param isFullFile 是否为全文件标签
+ * @returns 关联的文本内容
+ */
+function getAssociatedContent(lines: string[], tagLineIndex: number, isFullFile: boolean): string {
+  if (isFullFile) {
+    // 全文件标签：返回整个文件内容（跳过标签行）
+    const contentLines = lines.slice(tagLineIndex + 1).filter(line => {
+      // 跳过其他标签行和空行开头
+      return !line.trim().match(/^#(skill|equip|dungeon|set)-/);
+    });
+    return contentLines.join('\n').trim().substring(0, 500); // 限制长度
+  } else {
+    // 文中标签：从下一行到下一个空行
+    const contentLines: string[] = [];
+    for (let i = tagLineIndex + 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.trim() === '') {
+        break; // 遇到空行停止
+      }
+      // 如果遇到另一个标签，也停止
+      if (line.match(/#(skill|equip|dungeon|set)-/)) {
+        break;
+      }
+      contentLines.push(line);
+    }
+    return contentLines.join('\n').trim().substring(0, 300); // 限制长度
+  }
+}
 
 /**
  * 从文本内容中解析所有标签
@@ -36,7 +85,10 @@ export function parseTagsFromContent(content: string, sourceFile: string): Parse
 
     while ((match = TAG_REGEX.exec(line)) !== null) {
       const fullTag = match[0];
-      const parsed = parseTag(fullTag, sourceFile, lineNumber);
+      const isFullFile = isAtFileStart(lines, index);
+      const textContent = getAssociatedContent(lines, index, isFullFile);
+      
+      const parsed = parseTag(fullTag, sourceFile, lineNumber, textContent, isFullFile);
       if (parsed) {
         tags.push(parsed);
       }
@@ -51,9 +103,17 @@ export function parseTagsFromContent(content: string, sourceFile: string): Parse
  * @param tag 完整标签字符串，如 #skill-编程-python-装饰器
  * @param sourceFile 来源文件
  * @param lineNumber 行号
+ * @param textContent 关联的文本内容
+ * @param isFullFile 是否为全文件标签
  * @returns 解析后的标签对象，无效则返回 null
  */
-export function parseTag(tag: string, sourceFile: string, lineNumber: number): ParsedTag | null {
+export function parseTag(
+  tag: string, 
+  sourceFile: string, 
+  lineNumber: number,
+  textContent?: string,
+  isFullFile?: boolean
+): ParsedTag | null {
   // 移除 # 前缀
   const withoutHash = tag.startsWith('#') ? tag.slice(1) : tag;
   
@@ -82,6 +142,8 @@ export function parseTag(tag: string, sourceFile: string, lineNumber: number): P
     sourceFile,
     lineNumber,
     fullTag: tag,
+    textContent,
+    isFullFile,
   };
 }
 

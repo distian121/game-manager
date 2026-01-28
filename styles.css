@@ -1,29 +1,31 @@
 /* Game Manager Plugin Styles */
 
 .game-manager-view {
-  padding: 10px;
+  padding: 24px 32px;
   height: 100%;
   overflow-y: auto;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
-/* ===== ����ǩ�� ===== */
+/* ===== 主标签页 ===== */
 .gm-main-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 16px;
-  padding-bottom: 10px;
+  gap: 8px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
 .gm-tab-btn {
-  padding: 8px 12px;
+  padding: 10px 20px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--background-secondary);
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
   transition: all 0.2s ease;
 }
 
@@ -37,30 +39,30 @@
   color: var(--text-on-accent);
 }
 
-/* ===== �������� ===== */
+/* ===== 内容区域 ===== */
 .gm-content {
-  padding: 0 4px;
+  padding: 0;
 }
 
 .gm-content h3 {
-  margin: 0 0 8px 0;
-  font-size: 18px;
+  margin: 0 0 12px 0;
+  font-size: 24px;
   color: var(--text-normal);
 }
 
 .gm-panel-desc {
   color: var(--text-muted);
-  font-size: 13px;
-  margin: 0 0 16px 0;
+  font-size: 14px;
+  margin: 0 0 24px 0;
 }
 
 .gm-section {
-  margin-bottom: 24px;
+  margin-bottom: 32px;
 }
 
 .gm-section h4 {
-  margin: 0 0 12px 0;
-  font-size: 14px;
+  margin: 0 0 16px 0;
+  font-size: 18px;
 }
 
 /* ===== ͳ�ƿ�Ƭ ===== */
@@ -188,69 +190,105 @@
   border-left: 3px solid var(--interactive-accent);
 }
 
-/* ===== 嵌套卡片系统（文件夹预览风格） ===== */
+/* ===== 嵌套卡片系统（全宽展开风格） ===== */
 .gm-cards-container {
   display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
+  flex-direction: column;
+  gap: 20px;
   padding: 8px 0;
 }
 
-/* 外层容器卡片（透明文件夹风格） */
+/* 外层容器卡片（全宽透明文件夹） */
 .gm-folder-card {
-  background: rgba(var(--background-secondary-alt-rgb, 50, 50, 50), 0.3);
+  background: rgba(var(--background-secondary-alt-rgb, 50, 50, 50), 0.15);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(var(--background-modifier-border-rgb, 100, 100, 100), 0.4);
+  border: 1px solid rgba(var(--background-modifier-border-rgb, 100, 100, 100), 0.3);
   border-radius: 16px;
-  padding: 12px;
-  width: 140px;
+  padding: 20px;
+  width: 100%;
   cursor: pointer;
   transition: all 0.25s ease;
   position: relative;
 }
 
 .gm-folder-card:hover {
-  background: rgba(var(--background-secondary-alt-rgb, 50, 50, 50), 0.5);
-  transform: scale(1.03);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  background: rgba(var(--background-secondary-alt-rgb, 50, 50, 50), 0.25);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
   border-color: var(--interactive-accent);
 }
 
-/* 文件夹内的小卡片预览网格 */
+/* 文件夹头部 */
+.gm-folder-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.gm-folder-icon {
+  font-size: 28px;
+}
+
+.gm-folder-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-normal);
+  flex: 1;
+}
+
+/* 文件夹徽章 */
+.gm-folder-badge {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-size: 12px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 文件夹内的内容网格 */
 .gm-folder-preview {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
-  margin-bottom: 10px;
-  min-height: 70px;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
 }
 
 /* 预览中的小卡片 */
 .gm-mini-card {
   background: var(--background-secondary);
-  border-radius: 8px;
-  padding: 6px;
+  border-radius: 10px;
+  padding: 12px;
   text-align: center;
-  font-size: 10px;
-  color: var(--text-muted);
+  color: var(--text-normal);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 32px;
+  min-height: 60px;
   border: 1px solid var(--background-modifier-border);
-  overflow: hidden;
+  transition: all 0.15s ease;
+}
+
+.gm-mini-card:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
 }
 
 .gm-mini-card-icon {
-  font-size: 14px;
-  margin-bottom: 2px;
+  font-size: 20px;
+  margin-bottom: 6px;
 }
 
 .gm-mini-card-name {
-  font-size: 9px;
-  line-height: 1.2;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -260,24 +298,24 @@
 /* 更多项目指示 */
 .gm-mini-card-more {
   background: var(--background-modifier-hover);
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-weight: 600;
 }
 
-/* 文件夹标题 */
-.gm-folder-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-normal);
-  text-align: center;
-  margin-top: 4px;
-  white-space: nowrap;
+/* 内容预览文字 */
+.gm-content-preview {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--background-primary);
+  border-radius: 8px;
+  border-left: 3px solid var(--interactive-accent);
+  max-height: 120px;
   overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: pre-wrap;
+  line-height: 1.5;
 }
-
-/* 文件夹徽章 */
-.gm-folder-badge {
   position: absolute;
   top: -6px;
   right: -6px;

@@ -48,6 +48,36 @@ var TAG_PREFIXES = {
   "set": "set"
 };
 var TAG_REGEX = /#(skill|equip|dungeon|set)(-[a-zA-Z0-9\u4e00-\u9fa5_]+)+/g;
+function isAtFileStart(lines, lineIndex) {
+  let nonEmptyCount = 0;
+  for (let i = 0; i <= lineIndex && i < lines.length; i++) {
+    if (lines[i].trim() !== "") {
+      nonEmptyCount++;
+    }
+  }
+  return nonEmptyCount <= 3;
+}
+function getAssociatedContent(lines, tagLineIndex, isFullFile) {
+  if (isFullFile) {
+    const contentLines = lines.slice(tagLineIndex + 1).filter((line) => {
+      return !line.trim().match(/^#(skill|equip|dungeon|set)-/);
+    });
+    return contentLines.join("\n").trim().substring(0, 500);
+  } else {
+    const contentLines = [];
+    for (let i = tagLineIndex + 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.trim() === "") {
+        break;
+      }
+      if (line.match(/#(skill|equip|dungeon|set)-/)) {
+        break;
+      }
+      contentLines.push(line);
+    }
+    return contentLines.join("\n").trim().substring(0, 300);
+  }
+}
 function parseTagsFromContent(content, sourceFile) {
   const tags = [];
   const lines = content.split("\n");
@@ -57,7 +87,9 @@ function parseTagsFromContent(content, sourceFile) {
     TAG_REGEX.lastIndex = 0;
     while ((match = TAG_REGEX.exec(line)) !== null) {
       const fullTag = match[0];
-      const parsed = parseTag(fullTag, sourceFile, lineNumber);
+      const isFullFile = isAtFileStart(lines, index);
+      const textContent = getAssociatedContent(lines, index, isFullFile);
+      const parsed = parseTag(fullTag, sourceFile, lineNumber, textContent, isFullFile);
       if (parsed) {
         tags.push(parsed);
       }
@@ -65,7 +97,7 @@ function parseTagsFromContent(content, sourceFile) {
   });
   return tags;
 }
-function parseTag(tag, sourceFile, lineNumber) {
+function parseTag(tag, sourceFile, lineNumber, textContent, isFullFile) {
   const withoutHash = tag.startsWith("#") ? tag.slice(1) : tag;
   const parts = withoutHash.split("-");
   if (parts.length < 2) {
@@ -84,7 +116,9 @@ function parseTag(tag, sourceFile, lineNumber) {
     content,
     sourceFile,
     lineNumber,
-    fullTag: tag
+    fullTag: tag,
+    textContent,
+    isFullFile
   };
 }
 function buildPathFromTag(tag) {
@@ -212,7 +246,9 @@ var DataManager = class {
           content: tag.content,
           sourceFile: tag.sourceFile,
           lineNumber: tag.lineNumber,
-          fullTag: tag.fullTag
+          fullTag: tag.fullTag,
+          textContent: tag.textContent,
+          isFullFile: tag.isFullFile
         });
       }
       current = child;
@@ -743,17 +779,20 @@ var GameManagerView = class extends import_obsidian.ItemView {
     });
   }
   /**
-   * 渲染文件夹卡片（透明容器，内部预览子卡片）
+   * 渲染文件夹卡片（全宽透明容器，内部预览子卡片和内容）
    */
   renderFolderCard(container, node, type, typeIcon) {
     const folder = container.createDiv({ cls: "gm-folder-card" });
     const totalItems = this.countAllItems(node);
+    const header = folder.createDiv({ cls: "gm-folder-header" });
+    header.createDiv({ cls: "gm-folder-icon", text: "\u{1F4C1}" });
+    header.createDiv({ cls: "gm-folder-title", text: node.name });
     if (totalItems > 0) {
-      folder.createDiv({ cls: "gm-folder-badge", text: String(totalItems) });
+      header.createDiv({ cls: "gm-folder-badge", text: String(totalItems) });
     }
     const preview = folder.createDiv({ cls: "gm-folder-preview" });
-    const previewItems = this.getPreviewItems(node, 4);
-    previewItems.forEach((item, index) => {
+    const previewItems = this.getPreviewItems(node, 8);
+    previewItems.forEach((item) => {
       const miniCard = preview.createDiv({ cls: "gm-mini-card" });
       if (item.type === "more") {
         miniCard.addClass("gm-mini-card-more");
@@ -763,12 +802,13 @@ var GameManagerView = class extends import_obsidian.ItemView {
         miniCard.createDiv({ cls: "gm-mini-card-name", text: item.name });
       }
     });
-    const emptySlots = 4 - previewItems.length;
-    for (let i = 0; i < emptySlots; i++) {
-      const emptyCard = preview.createDiv({ cls: "gm-mini-card" });
-      emptyCard.style.visibility = "hidden";
+    if (node.items.length > 0) {
+      const firstItem = node.items[0];
+      if (firstItem.textContent) {
+        const contentPreview = folder.createDiv({ cls: "gm-content-preview" });
+        contentPreview.textContent = firstItem.textContent.substring(0, 200) + (firstItem.textContent.length > 200 ? "..." : "");
+      }
     }
-    folder.createDiv({ cls: "gm-folder-title", text: node.name });
     folder.addEventListener("click", () => {
       if (this.browseState) {
         this.browseState.path.push(node.name);
@@ -833,7 +873,7 @@ var GameManagerView = class extends import_obsidian.ItemView {
     });
   }
   /**
-   * 渲染内容项列表
+   * 渲染内容项列表（全宽卡片，显示文本预览）
    */
   renderContentItems(node) {
     if (node.items.length === 0)
@@ -842,9 +882,12 @@ var GameManagerView = class extends import_obsidian.ItemView {
     section.createEl("h4", { text: `\u{1F4DD} \u5185\u5BB9 (${node.items.length})` });
     const contentList = section.createDiv({ cls: "gm-content-list" });
     node.items.forEach((item) => {
-      const contentItem = contentList.createDiv({ cls: "gm-content-item" });
-      contentItem.createSpan({ cls: "gm-content-text", text: item.content });
-      const sourceEl = contentItem.createDiv({ cls: "gm-content-source" });
+      const contentCard = contentList.createDiv({ cls: "gm-folder-card" });
+      const header = contentCard.createDiv({ cls: "gm-folder-header" });
+      header.createDiv({ cls: "gm-folder-icon", text: item.isFullFile ? "\u{1F4C4}" : "\u{1F4DD}" });
+      const titleEl = header.createDiv({ cls: "gm-folder-title" });
+      titleEl.textContent = item.isFullFile ? `\u6574\u4E2A\u6587\u4EF6: ${this.getFileName(item.sourceFile)}` : item.content;
+      const sourceEl = header.createDiv({ cls: "gm-content-source" });
       const link = sourceEl.createEl("a", {
         cls: "gm-content-link",
         text: this.getFileName(item.sourceFile)
@@ -854,6 +897,13 @@ var GameManagerView = class extends import_obsidian.ItemView {
         this.app.workspace.openLinkText(item.sourceFile, "", false);
       });
       sourceEl.createSpan({ cls: "gm-content-line", text: `L${item.lineNumber}` });
+      if (item.textContent) {
+        const contentPreview = contentCard.createDiv({ cls: "gm-content-preview" });
+        contentPreview.textContent = item.textContent;
+      }
+      contentCard.addEventListener("click", () => {
+        this.app.workspace.openLinkText(item.sourceFile, "", false);
+      });
     });
   }
   /**
@@ -957,7 +1007,7 @@ var GameManagerPlugin = class extends import_obsidian2.Plugin {
     await this.savePluginData();
   }
   /**
-   * 激活视图（在侧边栏打开）
+   * 激活视图（在主编辑区打开）
    */
   async activateView() {
     const { workspace } = this.app;
@@ -966,7 +1016,7 @@ var GameManagerPlugin = class extends import_obsidian2.Plugin {
     if (leaves.length > 0) {
       leaf = leaves[0];
     } else {
-      leaf = workspace.getRightLeaf(false);
+      leaf = workspace.getLeaf("tab");
       if (leaf) {
         await leaf.setViewState({
           type: VIEW_TYPE_GAME_MANAGER,

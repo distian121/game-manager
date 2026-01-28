@@ -178,6 +178,8 @@ export class DataManager {
           sourceFile: tag.sourceFile,
           lineNumber: tag.lineNumber,
           fullTag: tag.fullTag,
+          textContent: tag.textContent,
+          isFullFile: tag.isFullFile,
         });
       }
 
