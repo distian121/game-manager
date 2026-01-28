@@ -213,7 +213,7 @@ export class GameManagerView extends ItemView {
     } else {
       const cardsContainer = section.createDiv({ cls: 'gm-cards-container' });
       sets.forEach(set => {
-        this.renderSetCard(cardsContainer, set);
+        this.renderSetFolderCard(cardsContainer, set);
       });
 
       // 添加新建按钮
@@ -227,21 +227,45 @@ export class GameManagerView extends ItemView {
   }
 
   /**
-   * 渲染单个套装卡片
+   * 渲染单个套装卡片（文件夹预览风格）
    */
-  private renderSetCard(container: HTMLElement, set: GameSet): void {
-    const card = container.createDiv({ cls: 'gm-card' });
+  private renderSetFolderCard(container: HTMLElement, set: GameSet): void {
+    const folder = container.createDiv({ cls: 'gm-folder-card' });
 
-    card.createDiv({ cls: 'gm-card-icon', text: '👑' });
-    card.createDiv({ cls: 'gm-card-title', text: set.name });
-    card.createDiv({ cls: 'gm-card-count', text: `${set.linkedItems.length} 个关联` });
-
+    // 徽章
     if (set.linkedItems.length > 0) {
-      card.createDiv({ cls: 'gm-card-badge', text: String(set.linkedItems.length) });
+      folder.createDiv({ cls: 'gm-folder-badge', text: String(set.linkedItems.length) });
     }
 
-    card.addEventListener('click', () => {
-      // 打开套装文件
+    // 预览网格（显示关联项）
+    const preview = folder.createDiv({ cls: 'gm-folder-preview' });
+    const previewCount = Math.min(set.linkedItems.length, 3);
+
+    for (let i = 0; i < previewCount; i++) {
+      const item = set.linkedItems[i];
+      const miniCard = preview.createDiv({ cls: 'gm-mini-card' });
+      miniCard.createDiv({ cls: 'gm-mini-card-icon', text: item.type === 'skill' ? '⚔️' : '🛡️' });
+      miniCard.createDiv({ cls: 'gm-mini-card-name', text: item.linkText.substring(0, 6) });
+    }
+
+    // 如果有更多
+    if (set.linkedItems.length > 3) {
+      const moreCard = preview.createDiv({ cls: 'gm-mini-card gm-mini-card-more' });
+      moreCard.createDiv({ cls: 'gm-mini-card-name', text: `+${set.linkedItems.length - 3}` });
+    }
+
+    // 填充空位
+    const filledSlots = previewCount + (set.linkedItems.length > 3 ? 1 : 0);
+    for (let i = filledSlots; i < 4; i++) {
+      const emptyCard = preview.createDiv({ cls: 'gm-mini-card' });
+      emptyCard.style.visibility = 'hidden';
+    }
+
+    // 标题
+    folder.createDiv({ cls: 'gm-folder-title', text: set.name });
+
+    // 点击打开文件
+    folder.addEventListener('click', () => {
       const file = this.app.vault.getAbstractFileByPath(set.filePath);
       if (file) {
         this.app.workspace.openLinkText(set.filePath, '', false);
@@ -390,16 +414,13 @@ export class GameManagerView extends ItemView {
   }
 
   /**
-   * 渲染卡片列表
+   * 渲染卡片列表（文件夹预览风格）
    */
   private renderCards(nodes: TreeNode[], type: 'skills' | 'equipment' | 'dungeon'): void {
     const cardsContainer = this.mainContentEl.createDiv({ cls: 'gm-cards-container' });
 
     // 根据类型选择图标
-    const getIcon = (hasChildren: boolean): string => {
-      if (hasChildren) {
-        return '📁';
-      }
+    const getTypeIcon = (): string => {
       switch (type) {
         case 'skills': return '⚔️';
         case 'equipment': return '🛡️';
@@ -408,36 +429,140 @@ export class GameManagerView extends ItemView {
     };
 
     nodes.forEach(node => {
-      const card = cardsContainer.createDiv({ cls: 'gm-card' });
-
       const hasChildren = node.children.length > 0;
+      const hasItems = node.items.length > 0;
       const totalItems = this.countAllItems(node);
 
-      // 图标
-      card.createDiv({ cls: 'gm-card-icon', text: getIcon(hasChildren) });
-
-      // 标题
-      card.createDiv({ cls: 'gm-card-title', text: node.name });
-
-      // 计数
+      // 判断是文件夹（有子节点）还是内容卡片（只有items）
       if (hasChildren) {
-        card.createDiv({ cls: 'gm-card-count', text: `${node.children.length} 个分类` });
-      } else if (node.items.length > 0) {
-        card.createDiv({ cls: 'gm-card-count', text: `${node.items.length} 条内容` });
+        // 文件夹卡片：透明容器，内部显示子项预览
+        this.renderFolderCard(cardsContainer, node, type, getTypeIcon());
+      } else if (hasItems) {
+        // 内容卡片：直接显示内容
+        this.renderContentCard(cardsContainer, node, getTypeIcon());
+      } else {
+        // 空节点也显示为文件夹
+        this.renderFolderCard(cardsContainer, node, type, getTypeIcon());
       }
+    });
+  }
 
-      // 徽章
-      if (totalItems > 0) {
-        card.createDiv({ cls: 'gm-card-badge', text: String(totalItems) });
+  /**
+   * 渲染文件夹卡片（透明容器，内部预览子卡片）
+   */
+  private renderFolderCard(container: HTMLElement, node: TreeNode, type: 'skills' | 'equipment' | 'dungeon', typeIcon: string): void {
+    const folder = container.createDiv({ cls: 'gm-folder-card' });
+
+    const totalItems = this.countAllItems(node);
+
+    // 徽章
+    if (totalItems > 0) {
+      folder.createDiv({ cls: 'gm-folder-badge', text: String(totalItems) });
+    }
+
+    // 预览网格（显示前4个子项）
+    const preview = folder.createDiv({ cls: 'gm-folder-preview' });
+    const previewItems = this.getPreviewItems(node, 4);
+
+    previewItems.forEach((item, index) => {
+      const miniCard = preview.createDiv({ cls: 'gm-mini-card' });
+
+      if (item.type === 'more') {
+        miniCard.addClass('gm-mini-card-more');
+        miniCard.createDiv({ cls: 'gm-mini-card-name', text: `+${item.count}` });
+      } else {
+        miniCard.createDiv({ cls: 'gm-mini-card-icon', text: item.icon });
+        miniCard.createDiv({ cls: 'gm-mini-card-name', text: item.name });
       }
+    });
 
-      // 点击进入下一级
-      card.addEventListener('click', () => {
-        if (this.browseState) {
-          this.browseState.path.push(node.name);
-          this.renderTab();
-        }
+    // 填充空位
+    const emptySlots = 4 - previewItems.length;
+    for (let i = 0; i < emptySlots; i++) {
+      const emptyCard = preview.createDiv({ cls: 'gm-mini-card' });
+      emptyCard.style.visibility = 'hidden';
+    }
+
+    // 文件夹标题
+    folder.createDiv({ cls: 'gm-folder-title', text: node.name });
+
+    // 点击进入
+    folder.addEventListener('click', () => {
+      if (this.browseState) {
+        this.browseState.path.push(node.name);
+        this.renderTab();
+      }
+    });
+  }
+
+  /**
+   * 获取预览项目
+   */
+  private getPreviewItems(node: TreeNode, maxCount: number): Array<{ type: 'child' | 'item' | 'more'; name: string; icon: string; count?: number }> {
+    const items: Array<{ type: 'child' | 'item' | 'more'; name: string; icon: string; count?: number }> = [];
+    
+    // 先添加子目录
+    for (const child of node.children) {
+      if (items.length >= maxCount - 1) break;
+      const hasSubChildren = child.children.length > 0;
+      items.push({
+        type: 'child',
+        name: child.name,
+        icon: hasSubChildren ? '📁' : '📄',
       });
+    }
+
+    // 再添加内容项
+    for (const item of node.items) {
+      if (items.length >= maxCount - 1) break;
+      items.push({
+        type: 'item',
+        name: item.content,
+        icon: '📝',
+      });
+    }
+
+    // 如果还有更多，显示 +N
+    const totalChildren = node.children.length + node.items.length;
+    if (totalChildren > maxCount - 1 && items.length === maxCount - 1) {
+      const remaining = totalChildren - (maxCount - 1);
+      items.push({
+        type: 'more',
+        name: `+${remaining}`,
+        icon: '',
+        count: remaining,
+      });
+    }
+
+    return items;
+  }
+
+  /**
+   * 渲染内容卡片（叶子节点，不嵌套）
+   */
+  private renderContentCard(container: HTMLElement, node: TreeNode, typeIcon: string): void {
+    const card = container.createDiv({ cls: 'gm-content-card' });
+
+    // 图标
+    card.createDiv({ cls: 'gm-content-card-icon', text: typeIcon });
+
+    // 标题
+    card.createDiv({ cls: 'gm-content-card-title', text: node.name });
+
+    // 来源（如果只有一个item）
+    if (node.items.length === 1) {
+      const source = card.createDiv({ cls: 'gm-content-card-source' });
+      source.textContent = this.getFileName(node.items[0].sourceFile);
+    } else if (node.items.length > 1) {
+      card.createDiv({ cls: 'gm-content-card-source', text: `${node.items.length} 条来源` });
+    }
+
+    // 点击进入查看详情
+    card.addEventListener('click', () => {
+      if (this.browseState) {
+        this.browseState.path.push(node.name);
+        this.renderTab();
+      }
     });
   }
 

@@ -188,61 +188,147 @@
   border-left: 3px solid var(--interactive-accent);
 }
 
-/* ===== 嵌套卡片系统 ===== */
+/* ===== 嵌套卡片系统（文件夹预览风格） ===== */
 .gm-cards-container {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 16px;
   padding: 8px 0;
 }
 
-.gm-card {
-  background: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 12px;
-  padding: 16px;
-  min-width: 120px;
-  max-width: 180px;
+/* 外层容器卡片（透明文件夹风格） */
+.gm-folder-card {
+  background: rgba(var(--background-secondary-alt-rgb, 50, 50, 50), 0.3);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(var(--background-modifier-border-rgb, 100, 100, 100), 0.4);
+  border-radius: 16px;
+  padding: 12px;
+  width: 140px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
   position: relative;
 }
 
-.gm-card:hover {
-  background: var(--background-modifier-hover);
-  transform: translateY(-3px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+.gm-folder-card:hover {
+  background: rgba(var(--background-secondary-alt-rgb, 50, 50, 50), 0.5);
+  transform: scale(1.03);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
   border-color: var(--interactive-accent);
 }
 
-.gm-card-icon {
-  font-size: 28px;
-  margin-bottom: 8px;
+/* 文件夹内的小卡片预览网格 */
+.gm-folder-preview {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+  min-height: 70px;
 }
 
-.gm-card-title {
+/* 预览中的小卡片 */
+.gm-mini-card {
+  background: var(--background-secondary);
+  border-radius: 8px;
+  padding: 6px;
+  text-align: center;
+  font-size: 10px;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  border: 1px solid var(--background-modifier-border);
+  overflow: hidden;
+}
+
+.gm-mini-card-icon {
   font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.gm-mini-card-name {
+  font-size: 9px;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 更多项目指示 */
+.gm-mini-card-more {
+  background: var(--background-modifier-hover);
+  color: var(--text-faint);
+  font-weight: 600;
+}
+
+/* 文件夹标题 */
+.gm-folder-title {
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-normal);
-  margin-bottom: 4px;
-  word-break: break-word;
+  text-align: center;
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.gm-card-count {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.gm-card-badge {
+/* 文件夹徽章 */
+.gm-folder-badge {
   position: absolute;
   top: -6px;
   right: -6px;
   background: var(--interactive-accent);
   color: var(--text-on-accent);
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 12px;
+  font-size: 10px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 内容项卡片（叶子节点，不嵌套） */
+.gm-content-card {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  min-width: 120px;
+  max-width: 160px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.gm-content-card:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.gm-content-card-icon {
+  font-size: 20px;
+  margin-bottom: 6px;
+}
+
+.gm-content-card-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-normal);
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+
+.gm-content-card-source {
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 /* 面包屑导航 */
@@ -278,11 +364,33 @@
   padding: 4px 8px;
 }
 
-/* 内容项列表 */
+/* 返回按钮 */
+.gm-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  transition: all 0.15s ease;
+}
+
+.gm-back-btn:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* 内容项列表（展开后） */
 .gm-content-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin-top: 16px;
 }
 
 .gm-content-item {
@@ -328,27 +436,6 @@
   color: var(--text-faint);
   font-family: var(--font-monospace);
   font-size: 11px;
-}
-
-/* 返回按钮 */
-.gm-back-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--text-muted);
-  margin-bottom: 12px;
-  transition: all 0.15s ease;
-}
-
-.gm-back-btn:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
 }
 
 /* ===== 空状态 ===== */

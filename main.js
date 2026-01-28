@@ -563,7 +563,7 @@ var GameManagerView = class extends import_obsidian.ItemView {
     } else {
       const cardsContainer = section.createDiv({ cls: "gm-cards-container" });
       sets.forEach((set) => {
-        this.renderSetCard(cardsContainer, set);
+        this.renderSetFolderCard(cardsContainer, set);
       });
       const addBtn = section.createEl("button", {
         cls: "gm-btn",
@@ -574,17 +574,32 @@ var GameManagerView = class extends import_obsidian.ItemView {
     }
   }
   /**
-   * 渲染单个套装卡片
+   * 渲染单个套装卡片（文件夹预览风格）
    */
-  renderSetCard(container, set) {
-    const card = container.createDiv({ cls: "gm-card" });
-    card.createDiv({ cls: "gm-card-icon", text: "\u{1F451}" });
-    card.createDiv({ cls: "gm-card-title", text: set.name });
-    card.createDiv({ cls: "gm-card-count", text: `${set.linkedItems.length} \u4E2A\u5173\u8054` });
+  renderSetFolderCard(container, set) {
+    const folder = container.createDiv({ cls: "gm-folder-card" });
     if (set.linkedItems.length > 0) {
-      card.createDiv({ cls: "gm-card-badge", text: String(set.linkedItems.length) });
+      folder.createDiv({ cls: "gm-folder-badge", text: String(set.linkedItems.length) });
     }
-    card.addEventListener("click", () => {
+    const preview = folder.createDiv({ cls: "gm-folder-preview" });
+    const previewCount = Math.min(set.linkedItems.length, 3);
+    for (let i = 0; i < previewCount; i++) {
+      const item = set.linkedItems[i];
+      const miniCard = preview.createDiv({ cls: "gm-mini-card" });
+      miniCard.createDiv({ cls: "gm-mini-card-icon", text: item.type === "skill" ? "\u2694\uFE0F" : "\u{1F6E1}\uFE0F" });
+      miniCard.createDiv({ cls: "gm-mini-card-name", text: item.linkText.substring(0, 6) });
+    }
+    if (set.linkedItems.length > 3) {
+      const moreCard = preview.createDiv({ cls: "gm-mini-card gm-mini-card-more" });
+      moreCard.createDiv({ cls: "gm-mini-card-name", text: `+${set.linkedItems.length - 3}` });
+    }
+    const filledSlots = previewCount + (set.linkedItems.length > 3 ? 1 : 0);
+    for (let i = filledSlots; i < 4; i++) {
+      const emptyCard = preview.createDiv({ cls: "gm-mini-card" });
+      emptyCard.style.visibility = "hidden";
+    }
+    folder.createDiv({ cls: "gm-folder-title", text: set.name });
+    folder.addEventListener("click", () => {
       const file = this.app.vault.getAbstractFileByPath(set.filePath);
       if (file) {
         this.app.workspace.openLinkText(set.filePath, "", false);
@@ -700,14 +715,11 @@ var GameManagerView = class extends import_obsidian.ItemView {
     }
   }
   /**
-   * 渲染卡片列表
+   * 渲染卡片列表（文件夹预览风格）
    */
   renderCards(nodes, type) {
     const cardsContainer = this.mainContentEl.createDiv({ cls: "gm-cards-container" });
-    const getIcon = (hasChildren) => {
-      if (hasChildren) {
-        return "\u{1F4C1}";
-      }
+    const getTypeIcon = () => {
       switch (type) {
         case "skills":
           return "\u2694\uFE0F";
@@ -718,25 +730,106 @@ var GameManagerView = class extends import_obsidian.ItemView {
       }
     };
     nodes.forEach((node) => {
-      const card = cardsContainer.createDiv({ cls: "gm-card" });
       const hasChildren = node.children.length > 0;
+      const hasItems = node.items.length > 0;
       const totalItems = this.countAllItems(node);
-      card.createDiv({ cls: "gm-card-icon", text: getIcon(hasChildren) });
-      card.createDiv({ cls: "gm-card-title", text: node.name });
       if (hasChildren) {
-        card.createDiv({ cls: "gm-card-count", text: `${node.children.length} \u4E2A\u5206\u7C7B` });
-      } else if (node.items.length > 0) {
-        card.createDiv({ cls: "gm-card-count", text: `${node.items.length} \u6761\u5185\u5BB9` });
+        this.renderFolderCard(cardsContainer, node, type, getTypeIcon());
+      } else if (hasItems) {
+        this.renderContentCard(cardsContainer, node, getTypeIcon());
+      } else {
+        this.renderFolderCard(cardsContainer, node, type, getTypeIcon());
       }
-      if (totalItems > 0) {
-        card.createDiv({ cls: "gm-card-badge", text: String(totalItems) });
+    });
+  }
+  /**
+   * 渲染文件夹卡片（透明容器，内部预览子卡片）
+   */
+  renderFolderCard(container, node, type, typeIcon) {
+    const folder = container.createDiv({ cls: "gm-folder-card" });
+    const totalItems = this.countAllItems(node);
+    if (totalItems > 0) {
+      folder.createDiv({ cls: "gm-folder-badge", text: String(totalItems) });
+    }
+    const preview = folder.createDiv({ cls: "gm-folder-preview" });
+    const previewItems = this.getPreviewItems(node, 4);
+    previewItems.forEach((item, index) => {
+      const miniCard = preview.createDiv({ cls: "gm-mini-card" });
+      if (item.type === "more") {
+        miniCard.addClass("gm-mini-card-more");
+        miniCard.createDiv({ cls: "gm-mini-card-name", text: `+${item.count}` });
+      } else {
+        miniCard.createDiv({ cls: "gm-mini-card-icon", text: item.icon });
+        miniCard.createDiv({ cls: "gm-mini-card-name", text: item.name });
       }
-      card.addEventListener("click", () => {
-        if (this.browseState) {
-          this.browseState.path.push(node.name);
-          this.renderTab();
-        }
+    });
+    const emptySlots = 4 - previewItems.length;
+    for (let i = 0; i < emptySlots; i++) {
+      const emptyCard = preview.createDiv({ cls: "gm-mini-card" });
+      emptyCard.style.visibility = "hidden";
+    }
+    folder.createDiv({ cls: "gm-folder-title", text: node.name });
+    folder.addEventListener("click", () => {
+      if (this.browseState) {
+        this.browseState.path.push(node.name);
+        this.renderTab();
+      }
+    });
+  }
+  /**
+   * 获取预览项目
+   */
+  getPreviewItems(node, maxCount) {
+    const items = [];
+    for (const child of node.children) {
+      if (items.length >= maxCount - 1)
+        break;
+      const hasSubChildren = child.children.length > 0;
+      items.push({
+        type: "child",
+        name: child.name,
+        icon: hasSubChildren ? "\u{1F4C1}" : "\u{1F4C4}"
       });
+    }
+    for (const item of node.items) {
+      if (items.length >= maxCount - 1)
+        break;
+      items.push({
+        type: "item",
+        name: item.content,
+        icon: "\u{1F4DD}"
+      });
+    }
+    const totalChildren = node.children.length + node.items.length;
+    if (totalChildren > maxCount - 1 && items.length === maxCount - 1) {
+      const remaining = totalChildren - (maxCount - 1);
+      items.push({
+        type: "more",
+        name: `+${remaining}`,
+        icon: "",
+        count: remaining
+      });
+    }
+    return items;
+  }
+  /**
+   * 渲染内容卡片（叶子节点，不嵌套）
+   */
+  renderContentCard(container, node, typeIcon) {
+    const card = container.createDiv({ cls: "gm-content-card" });
+    card.createDiv({ cls: "gm-content-card-icon", text: typeIcon });
+    card.createDiv({ cls: "gm-content-card-title", text: node.name });
+    if (node.items.length === 1) {
+      const source = card.createDiv({ cls: "gm-content-card-source" });
+      source.textContent = this.getFileName(node.items[0].sourceFile);
+    } else if (node.items.length > 1) {
+      card.createDiv({ cls: "gm-content-card-source", text: `${node.items.length} \u6761\u6765\u6E90` });
+    }
+    card.addEventListener("click", () => {
+      if (this.browseState) {
+        this.browseState.path.push(node.name);
+        this.renderTab();
+      }
     });
   }
   /**
