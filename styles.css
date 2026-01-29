@@ -561,3 +561,246 @@
 .game-manager-view::-webkit-scrollbar-thumb:hover {
   background: var(--background-modifier-border-hover);
 }
+
+/* ===== 输入对话框样式 ===== */
+.gm-input-modal {
+  padding: 16px;
+}
+
+.gm-input-modal h2 {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+}
+
+.gm-input-modal .setting-item {
+  border-top: none;
+  padding: 8px 0;
+}
+
+.gm-input-modal textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.gm-modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+/* ===== 搜索对话框样式 ===== */
+.gm-search-modal {
+  padding: 16px;
+  min-width: 500px;
+}
+
+.gm-search-modal h2 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+}
+
+.gm-search-modal h4 {
+  margin: 16px 0 8px 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.gm-search-container {
+  margin-bottom: 12px;
+}
+
+.gm-search-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-primary);
+  font-size: 14px;
+}
+
+.gm-search-input:focus {
+  border-color: var(--interactive-accent);
+  outline: none;
+}
+
+.gm-filter-container {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.gm-filter-chip {
+  padding: 4px 12px;
+  border-radius: 16px;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.gm-filter-chip:hover {
+  background: var(--background-modifier-hover);
+}
+
+.gm-filter-chip-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.gm-search-results {
+  max-height: 250px;
+  overflow-y: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+  padding: 8px;
+}
+
+.gm-search-hint {
+  text-align: center;
+  padding: 30px 20px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.gm-search-group {
+  margin-bottom: 12px;
+}
+
+.gm-search-group:last-child {
+  margin-bottom: 0;
+}
+
+.gm-search-group-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  padding-left: 4px;
+}
+
+.gm-search-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gm-search-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.gm-search-item:hover {
+  background: var(--background-modifier-hover);
+}
+
+.gm-search-item-selected {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.gm-search-item-selected:hover {
+  background: var(--interactive-accent-hover);
+}
+
+.gm-search-item-icon {
+  font-size: 14px;
+}
+
+.gm-search-item-name {
+  flex: 1;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gm-search-item-path {
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+.gm-search-item-selected .gm-search-item-path {
+  color: var(--text-on-accent);
+  opacity: 0.7;
+}
+
+.gm-search-more {
+  text-align: center;
+  padding: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.gm-selected-items {
+  min-height: 40px;
+  padding: 8px;
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gm-selected-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  width: 100%;
+  text-align: center;
+  padding: 8px;
+}
+
+.gm-selected-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-radius: 16px;
+  font-size: 12px;
+}
+
+.gm-selected-remove {
+  cursor: pointer;
+  font-weight: bold;
+  opacity: 0.8;
+}
+
+.gm-selected-remove:hover {
+  opacity: 1;
+}
+
+/* ===== 套装卡片增强样式 ===== */
+.gm-folder-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gm-folder-stats {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  display: flex;
+  gap: 8px;
+}
+
+.gm-folder-stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}

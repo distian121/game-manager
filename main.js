@@ -22,7 +22,7 @@ __export(main_exports, {
   default: () => GameManagerPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian2 = require("obsidian");
+var import_obsidian4 = require("obsidian");
 
 // src/types.ts
 var DEFAULT_SETTINGS = {
@@ -39,6 +39,9 @@ var DEFAULT_DATA = {
   fileIndex: {}
 };
 var VIEW_TYPE_GAME_MANAGER = "game-manager-view";
+
+// src/services/DataManager.ts
+var import_obsidian = require("obsidian");
 
 // src/services/TagParser.ts
 var TAG_PREFIXES = {
@@ -335,23 +338,45 @@ var DataManager = class {
     try {
       const content = await this.app.vault.read(file);
       const name = file.basename;
-      const linkRegex = /\[\[([^\]]+)\]\]/g;
-      const linkedItems = [];
-      let match;
-      while ((match = linkRegex.exec(content)) !== null) {
-        const linkText = match[1];
-        const item = {
-          type: "skill",
-          // 默认，可根据链接目标文件中的标签判断
-          linkText
-        };
-        linkedItems.push(item);
+      const linkedDungeons = [];
+      const linkedSkills = [];
+      const linkedEquipment = [];
+      let description;
+      const lines = content.split("\n");
+      let currentSection = "";
+      for (const line of lines) {
+        const sectionMatch = line.match(/^##\s+(.+)/);
+        if (sectionMatch) {
+          currentSection = sectionMatch[1].trim();
+          continue;
+        }
+        if (!description && currentSection === "\u63CF\u8FF0" && line.trim()) {
+          description = line.trim();
+          continue;
+        }
+        const linkRegex = /\[\[([^\]]+)\]\]/g;
+        let match;
+        while ((match = linkRegex.exec(line)) !== null) {
+          const linkText = match[1];
+          if (currentSection.includes("\u526F\u672C") || currentSection.includes("\u6765\u6E90") || currentSection.includes("\u7075\u611F")) {
+            linkedDungeons.push({ type: "dungeon", linkText, section: currentSection });
+          } else if (currentSection.includes("\u6280\u80FD")) {
+            linkedSkills.push({ type: "skill", linkText, section: currentSection });
+          } else if (currentSection.includes("\u88C5\u5907")) {
+            linkedEquipment.push({ type: "equip", linkText, section: currentSection });
+          } else {
+            linkedSkills.push({ type: "skill", linkText, section: currentSection });
+          }
+        }
       }
       const existingIndex = this.data.sets.findIndex((s) => s.filePath === file.path);
       const set = {
         name,
         filePath: file.path,
-        linkedItems
+        linkedDungeons,
+        linkedSkills,
+        linkedEquipment,
+        description
       };
       if (existingIndex >= 0) {
         this.data.sets[existingIndex] = set;
@@ -432,24 +457,167 @@ var DataManager = class {
   /**
    * 创建新套装
    */
-  async createSet(name) {
+  async createSet(name, description) {
     await this.ensureSetsFolder();
     const path = `${this.settings.setsFolder}/${name}.md`;
+    const descText = description ? `${description}` : "";
     const content = `# ${name}
+
+## \u63CF\u8FF0
+
+${descText}
+
+## \u7075\u611F\u6765\u6E90\uFF08\u526F\u672C\uFF09
+
 
 ## \u5173\u8054\u6280\u80FD
 
+
 ## \u5173\u8054\u88C5\u5907
+
 `;
     const file = await this.app.vault.create(path, content);
     await this.updateSet(file);
     return file;
   }
+  /**
+   * 向套装添加关联项
+   */
+  async addItemToSet(setFilePath, linkText, type) {
+    var _a;
+    const file = this.app.vault.getAbstractFileByPath(setFilePath);
+    if (!(file instanceof import_obsidian.TFile))
+      return;
+    let content = await this.app.vault.read(file);
+    let sectionHeader;
+    if (type === "dungeon") {
+      sectionHeader = "## \u7075\u611F\u6765\u6E90\uFF08\u526F\u672C\uFF09";
+    } else if (type === "skill") {
+      sectionHeader = "## \u5173\u8054\u6280\u80FD";
+    } else {
+      sectionHeader = "## \u5173\u8054\u88C5\u5907";
+    }
+    const sectionIndex = content.indexOf(sectionHeader);
+    if (sectionIndex === -1) {
+      content += `
+${sectionHeader}
+
+- [[${linkText}]]
+`;
+    } else {
+      const insertPos = sectionIndex + sectionHeader.length;
+      const restContent = content.substring(insertPos);
+      const nextSectionMatch = restContent.match(/\n## /);
+      const insertPoint = nextSectionMatch ? insertPos + ((_a = nextSectionMatch.index) != null ? _a : 0) : content.length;
+      const sectionContent = content.substring(sectionIndex, insertPoint);
+      if (sectionContent.includes(`[[${linkText}]]`)) {
+        return;
+      }
+      content = content.substring(0, insertPoint) + `- [[${linkText}]]
+` + content.substring(insertPoint);
+    }
+    await this.app.vault.modify(file, content);
+    await this.updateSet(file);
+  }
+  /**
+   * 从套装移除关联项
+   */
+  async removeItemFromSet(setFilePath, linkText) {
+    const file = this.app.vault.getAbstractFileByPath(setFilePath);
+    if (!(file instanceof import_obsidian.TFile))
+      return;
+    let content = await this.app.vault.read(file);
+    const lines = content.split("\n");
+    const filtered = lines.filter((line) => !line.includes(`[[${linkText}]]`));
+    content = filtered.join("\n");
+    await this.app.vault.modify(file, content);
+    await this.updateSet(file);
+  }
 };
 
 // src/views/GameManagerView.ts
-var import_obsidian = require("obsidian");
-var GameManagerView = class extends import_obsidian.ItemView {
+var import_obsidian3 = require("obsidian");
+
+// src/ui/InputModal.ts
+var import_obsidian2 = require("obsidian");
+var InputModal = class extends import_obsidian2.Modal {
+  constructor(app, options, onSubmit) {
+    var _a;
+    super(app);
+    this.result = null;
+    this.title = options.title;
+    this.namePlaceholder = options.namePlaceholder || "\u8F93\u5165\u540D\u79F0";
+    this.showDescription = (_a = options.showDescription) != null ? _a : true;
+    this.onSubmit = onSubmit;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.addClass("gm-input-modal");
+    contentEl.createEl("h2", { text: this.title });
+    let nameValue = "";
+    let descValue = "";
+    new import_obsidian2.Setting(contentEl).setName("\u540D\u79F0").setDesc("\u5957\u88C5\u540D\u79F0\uFF08\u5C06\u4F5C\u4E3A\u6587\u4EF6\u540D\uFF09").addText(
+      (text) => text.setPlaceholder(this.namePlaceholder).onChange((value) => {
+        nameValue = value;
+      })
+    );
+    if (this.showDescription) {
+      new import_obsidian2.Setting(contentEl).setName("\u63CF\u8FF0").setDesc("\u7B80\u77ED\u63CF\u8FF0\uFF08\u53EF\u9009\uFF09").addTextArea(
+        (textarea) => textarea.setPlaceholder("\u8F93\u5165\u5957\u88C5\u63CF\u8FF0...").onChange((value) => {
+          descValue = value;
+        })
+      );
+    }
+    const buttonContainer = contentEl.createDiv({ cls: "gm-modal-buttons" });
+    const cancelBtn = buttonContainer.createEl("button", {
+      text: "\u53D6\u6D88",
+      cls: "gm-btn"
+    });
+    cancelBtn.addEventListener("click", () => {
+      this.close();
+    });
+    const submitBtn = buttonContainer.createEl("button", {
+      text: "\u521B\u5EFA",
+      cls: "gm-btn gm-btn-primary"
+    });
+    submitBtn.addEventListener("click", () => {
+      if (nameValue.trim()) {
+        this.result = {
+          name: nameValue.trim(),
+          description: descValue.trim() || void 0
+        };
+        this.close();
+      }
+    });
+    contentEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        if (nameValue.trim()) {
+          this.result = {
+            name: nameValue.trim(),
+            description: descValue.trim() || void 0
+          };
+          this.close();
+        }
+      }
+    });
+  }
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+    this.onSubmit(this.result);
+  }
+};
+function showInputModal(app, options) {
+  return new Promise((resolve) => {
+    const modal = new InputModal(app, options, (result) => {
+      resolve(result);
+    });
+    modal.open();
+  });
+}
+
+// src/views/GameManagerView.ts
+var GameManagerView = class extends import_obsidian3.ItemView {
   constructor(leaf, plugin, dataManager) {
     super(leaf);
     this.activeTab = "home";
@@ -612,28 +780,65 @@ var GameManagerView = class extends import_obsidian.ItemView {
    * 渲染单个套装卡片（文件夹预览风格）
    */
   renderSetFolderCard(container, set) {
+    var _a, _b, _c;
     const folder = container.createDiv({ cls: "gm-folder-card" });
-    if (set.linkedItems.length > 0) {
-      folder.createDiv({ cls: "gm-folder-badge", text: String(set.linkedItems.length) });
+    const totalDungeons = ((_a = set.linkedDungeons) == null ? void 0 : _a.length) || 0;
+    const totalSkills = ((_b = set.linkedSkills) == null ? void 0 : _b.length) || 0;
+    const totalEquipment = ((_c = set.linkedEquipment) == null ? void 0 : _c.length) || 0;
+    const totalItems = totalDungeons + totalSkills + totalEquipment;
+    if (totalItems > 0) {
+      folder.createDiv({ cls: "gm-folder-badge", text: String(totalItems) });
     }
     const preview = folder.createDiv({ cls: "gm-folder-preview" });
-    const previewCount = Math.min(set.linkedItems.length, 3);
-    for (let i = 0; i < previewCount; i++) {
-      const item = set.linkedItems[i];
-      const miniCard = preview.createDiv({ cls: "gm-mini-card" });
-      miniCard.createDiv({ cls: "gm-mini-card-icon", text: item.type === "skill" ? "\u2694\uFE0F" : "\u{1F6E1}\uFE0F" });
-      miniCard.createDiv({ cls: "gm-mini-card-name", text: item.linkText.substring(0, 6) });
+    let previewSlots = 0;
+    const maxSlots = 4;
+    if (set.linkedDungeons) {
+      for (const item of set.linkedDungeons.slice(0, maxSlots - previewSlots)) {
+        const miniCard = preview.createDiv({ cls: "gm-mini-card" });
+        miniCard.createDiv({ cls: "gm-mini-card-icon", text: "\u{1F3F0}" });
+        miniCard.createDiv({ cls: "gm-mini-card-name", text: item.linkText.substring(0, 6) });
+        previewSlots++;
+      }
     }
-    if (set.linkedItems.length > 3) {
+    if (previewSlots < maxSlots && set.linkedSkills) {
+      for (const item of set.linkedSkills.slice(0, maxSlots - previewSlots)) {
+        const miniCard = preview.createDiv({ cls: "gm-mini-card" });
+        miniCard.createDiv({ cls: "gm-mini-card-icon", text: "\u2694\uFE0F" });
+        miniCard.createDiv({ cls: "gm-mini-card-name", text: item.linkText.substring(0, 6) });
+        previewSlots++;
+      }
+    }
+    if (previewSlots < maxSlots && set.linkedEquipment) {
+      for (const item of set.linkedEquipment.slice(0, maxSlots - previewSlots)) {
+        const miniCard = preview.createDiv({ cls: "gm-mini-card" });
+        miniCard.createDiv({ cls: "gm-mini-card-icon", text: "\u{1F6E1}\uFE0F" });
+        miniCard.createDiv({ cls: "gm-mini-card-name", text: item.linkText.substring(0, 6) });
+        previewSlots++;
+      }
+    }
+    const remaining = totalItems - previewSlots;
+    if (remaining > 0 && previewSlots < maxSlots) {
       const moreCard = preview.createDiv({ cls: "gm-mini-card gm-mini-card-more" });
-      moreCard.createDiv({ cls: "gm-mini-card-name", text: `+${set.linkedItems.length - 3}` });
+      moreCard.createDiv({ cls: "gm-mini-card-name", text: `+${remaining}` });
+      previewSlots++;
     }
-    const filledSlots = previewCount + (set.linkedItems.length > 3 ? 1 : 0);
-    for (let i = filledSlots; i < 4; i++) {
+    for (let i = previewSlots; i < maxSlots; i++) {
       const emptyCard = preview.createDiv({ cls: "gm-mini-card" });
       emptyCard.style.visibility = "hidden";
     }
     folder.createDiv({ cls: "gm-folder-title", text: set.name });
+    if (set.description) {
+      const desc = folder.createDiv({ cls: "gm-folder-desc" });
+      desc.textContent = set.description.length > 30 ? set.description.substring(0, 30) + "..." : set.description;
+    } else {
+      const stats = folder.createDiv({ cls: "gm-folder-stats" });
+      if (totalDungeons > 0)
+        stats.createSpan({ text: `\u{1F3F0}${totalDungeons}` });
+      if (totalSkills > 0)
+        stats.createSpan({ text: `\u2694\uFE0F${totalSkills}` });
+      if (totalEquipment > 0)
+        stats.createSpan({ text: `\u{1F6E1}\uFE0F${totalEquipment}` });
+    }
     folder.addEventListener("click", () => {
       const file = this.app.vault.getAbstractFileByPath(set.filePath);
       if (file) {
@@ -645,21 +850,16 @@ var GameManagerView = class extends import_obsidian.ItemView {
    * 创建新套装
    */
   async createNewSet() {
-    const name = await this.promptForName("\u8F93\u5165\u5957\u88C5\u540D\u79F0");
-    if (name) {
-      const file = await this.dataManager.createSet(name);
+    const result = await showInputModal(this.app, {
+      title: "\u521B\u5EFA\u65B0\u5957\u88C5",
+      namePlaceholder: "\u8F93\u5165\u5957\u88C5\u540D\u79F0",
+      showDescription: true
+    });
+    if (result && result.name) {
+      const file = await this.dataManager.createSet(result.name, result.description);
       this.app.workspace.openLinkText(file.path, "", false);
       this.renderTab();
     }
-  }
-  /**
-   * 简单的输入提示
-   */
-  promptForName(message) {
-    return new Promise((resolve) => {
-      const name = prompt(message);
-      resolve(name);
-    });
   }
   /**
    * 渲染帮助区域
@@ -892,9 +1092,9 @@ var GameManagerView = class extends import_obsidian.ItemView {
    * 使用 Obsidian 的 MarkdownRenderer 渲染 Markdown 内容
    */
   renderMarkdown(content, container, sourcePath) {
-    const component = new import_obsidian.Component();
+    const component = new import_obsidian3.Component();
     component.load();
-    import_obsidian.MarkdownRenderer.render(
+    import_obsidian3.MarkdownRenderer.render(
       this.app,
       content,
       container,
@@ -963,7 +1163,7 @@ var GameManagerView = class extends import_obsidian.ItemView {
 };
 
 // src/main.ts
-var GameManagerPlugin = class extends import_obsidian2.Plugin {
+var GameManagerPlugin = class extends import_obsidian4.Plugin {
   constructor() {
     super(...arguments);
     this.view = null;
@@ -998,21 +1198,21 @@ var GameManagerPlugin = class extends import_obsidian2.Plugin {
     if (this.settings.enableRealTimeUpdate) {
       this.registerEvent(
         this.app.vault.on("modify", (file) => {
-          if (file instanceof import_obsidian2.TFile && file.extension === "md") {
+          if (file instanceof import_obsidian4.TFile && file.extension === "md") {
             this.onFileModify(file);
           }
         })
       );
       this.registerEvent(
         this.app.vault.on("delete", (file) => {
-          if (file instanceof import_obsidian2.TFile && file.extension === "md") {
+          if (file instanceof import_obsidian4.TFile && file.extension === "md") {
             this.onFileDelete(file);
           }
         })
       );
       this.registerEvent(
         this.app.vault.on("rename", (file, oldPath) => {
-          if (file instanceof import_obsidian2.TFile && file.extension === "md") {
+          if (file instanceof import_obsidian4.TFile && file.extension === "md") {
             this.onFileRename(file, oldPath);
           }
         })

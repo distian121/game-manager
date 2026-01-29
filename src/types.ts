@@ -40,15 +40,20 @@ export interface ParsedTag {
 export interface GameSet {
   name: string;           // 套装名称
   filePath: string;       // 索引文件路径
-  linkedItems: LinkedItem[]; // 关联的技能/装备
+  linkedSkills: LinkedItem[];    // 关联的技能
+  linkedEquipment: LinkedItem[]; // 关联的装备
+  linkedDungeons: LinkedItem[];  // 关联的副本（灵感来源）
   description?: string;   // 描述
+  // 向后兼容：linkedItems 保留用于读取旧数据
+  linkedItems?: LinkedItem[];
 }
 
 // 套装中的关联项
 export interface LinkedItem {
-  type: 'skill' | 'equip';
+  type: 'skill' | 'equip' | 'dungeon';
   linkText: string;       // [[链接文本]]
   targetFile?: string;    // 目标文件路径（如果存在）
+  section?: string;       // 所在章节（用于解析）
 }
 
 // 插件缓存数据结构

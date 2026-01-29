@@ -6,6 +6,7 @@
 import { ItemView, WorkspaceLeaf, MarkdownRenderer, Component } from 'obsidian';
 import { VIEW_TYPE_GAME_MANAGER, TreeNode, GameSet, TreeItem } from '../types';
 import { DataManager } from '../services/DataManager';
+import { showInputModal } from '../ui/InputModal';
 import type GameManagerPlugin from '../main';
 
 type TabType = 'home' | 'skills' | 'equipment' | 'dungeon';
@@ -230,37 +231,79 @@ export class GameManagerView extends ItemView {
   private renderSetFolderCard(container: HTMLElement, set: GameSet): void {
     const folder = container.createDiv({ cls: 'gm-folder-card' });
 
+    // 统计数量
+    const totalDungeons = set.linkedDungeons?.length || 0;
+    const totalSkills = set.linkedSkills?.length || 0;
+    const totalEquipment = set.linkedEquipment?.length || 0;
+    const totalItems = totalDungeons + totalSkills + totalEquipment;
+
     // 徽章
-    if (set.linkedItems.length > 0) {
-      folder.createDiv({ cls: 'gm-folder-badge', text: String(set.linkedItems.length) });
+    if (totalItems > 0) {
+      folder.createDiv({ cls: 'gm-folder-badge', text: String(totalItems) });
     }
 
-    // 预览网格（显示关联项）
+    // 预览网格（优先显示副本来源）
     const preview = folder.createDiv({ cls: 'gm-folder-preview' });
-    const previewCount = Math.min(set.linkedItems.length, 3);
+    let previewSlots = 0;
+    const maxSlots = 4;
 
-    for (let i = 0; i < previewCount; i++) {
-      const item = set.linkedItems[i];
-      const miniCard = preview.createDiv({ cls: 'gm-mini-card' });
-      miniCard.createDiv({ cls: 'gm-mini-card-icon', text: item.type === 'skill' ? '⚔️' : '🛡️' });
-      miniCard.createDiv({ cls: 'gm-mini-card-name', text: item.linkText.substring(0, 6) });
+    // 先显示副本
+    if (set.linkedDungeons) {
+      for (const item of set.linkedDungeons.slice(0, maxSlots - previewSlots)) {
+        const miniCard = preview.createDiv({ cls: 'gm-mini-card' });
+        miniCard.createDiv({ cls: 'gm-mini-card-icon', text: '🏰' });
+        miniCard.createDiv({ cls: 'gm-mini-card-name', text: item.linkText.substring(0, 6) });
+        previewSlots++;
+      }
+    }
+
+    // 再显示技能
+    if (previewSlots < maxSlots && set.linkedSkills) {
+      for (const item of set.linkedSkills.slice(0, maxSlots - previewSlots)) {
+        const miniCard = preview.createDiv({ cls: 'gm-mini-card' });
+        miniCard.createDiv({ cls: 'gm-mini-card-icon', text: '⚔️' });
+        miniCard.createDiv({ cls: 'gm-mini-card-name', text: item.linkText.substring(0, 6) });
+        previewSlots++;
+      }
+    }
+
+    // 最后显示装备
+    if (previewSlots < maxSlots && set.linkedEquipment) {
+      for (const item of set.linkedEquipment.slice(0, maxSlots - previewSlots)) {
+        const miniCard = preview.createDiv({ cls: 'gm-mini-card' });
+        miniCard.createDiv({ cls: 'gm-mini-card-icon', text: '🛡️' });
+        miniCard.createDiv({ cls: 'gm-mini-card-name', text: item.linkText.substring(0, 6) });
+        previewSlots++;
+      }
     }
 
     // 如果有更多
-    if (set.linkedItems.length > 3) {
+    const remaining = totalItems - previewSlots;
+    if (remaining > 0 && previewSlots < maxSlots) {
       const moreCard = preview.createDiv({ cls: 'gm-mini-card gm-mini-card-more' });
-      moreCard.createDiv({ cls: 'gm-mini-card-name', text: `+${set.linkedItems.length - 3}` });
+      moreCard.createDiv({ cls: 'gm-mini-card-name', text: `+${remaining}` });
+      previewSlots++;
     }
 
     // 填充空位
-    const filledSlots = previewCount + (set.linkedItems.length > 3 ? 1 : 0);
-    for (let i = filledSlots; i < 4; i++) {
+    for (let i = previewSlots; i < maxSlots; i++) {
       const emptyCard = preview.createDiv({ cls: 'gm-mini-card' });
       emptyCard.style.visibility = 'hidden';
     }
 
     // 标题
     folder.createDiv({ cls: 'gm-folder-title', text: set.name });
+
+    // 描述或统计
+    if (set.description) {
+      const desc = folder.createDiv({ cls: 'gm-folder-desc' });
+      desc.textContent = set.description.length > 30 ? set.description.substring(0, 30) + '...' : set.description;
+    } else {
+      const stats = folder.createDiv({ cls: 'gm-folder-stats' });
+      if (totalDungeons > 0) stats.createSpan({ text: `🏰${totalDungeons}` });
+      if (totalSkills > 0) stats.createSpan({ text: `⚔️${totalSkills}` });
+      if (totalEquipment > 0) stats.createSpan({ text: `🛡️${totalEquipment}` });
+    }
 
     // 点击打开文件
     folder.addEventListener('click', () => {
@@ -275,22 +318,17 @@ export class GameManagerView extends ItemView {
    * 创建新套装
    */
   private async createNewSet(): Promise<void> {
-    const name = await this.promptForName('输入套装名称');
-    if (name) {
-      const file = await this.dataManager.createSet(name);
+    const result = await showInputModal(this.app, {
+      title: '创建新套装',
+      namePlaceholder: '输入套装名称',
+      showDescription: true,
+    });
+
+    if (result && result.name) {
+      const file = await this.dataManager.createSet(result.name, result.description);
       this.app.workspace.openLinkText(file.path, '', false);
       this.renderTab();
     }
-  }
-
-  /**
-   * 简单的输入提示
-   */
-  private promptForName(message: string): Promise<string | null> {
-    return new Promise(resolve => {
-      const name = prompt(message);
-      resolve(name);
-    });
   }
 
   /**

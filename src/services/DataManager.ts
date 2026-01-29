@@ -289,19 +289,49 @@ export class DataManager {
       const content = await this.app.vault.read(file);
       const name = file.basename;
 
-      // 解析 [[]] 链接
-      const linkRegex = /\[\[([^\]]+)\]\]/g;
-      const linkedItems: LinkedItem[] = [];
-      let match: RegExpExecArray | null;
+      // 按章节解析链接
+      const linkedDungeons: LinkedItem[] = [];
+      const linkedSkills: LinkedItem[] = [];
+      const linkedEquipment: LinkedItem[] = [];
+      let description: string | undefined;
 
-      while ((match = linkRegex.exec(content)) !== null) {
-        const linkText = match[1];
-        // 根据链接内容判断类型（可以后续优化）
-        const item: LinkedItem = {
-          type: 'skill', // 默认，可根据链接目标文件中的标签判断
-          linkText,
-        };
-        linkedItems.push(item);
+      // 分割内容为行
+      const lines = content.split('\n');
+      let currentSection = '';
+
+      for (const line of lines) {
+        // 检测章节标题
+        const sectionMatch = line.match(/^##\s+(.+)/);
+        if (sectionMatch) {
+          currentSection = sectionMatch[1].trim();
+          continue;
+        }
+
+        // 提取描述（第一段非空文本）
+        if (!description && currentSection === '描述' && line.trim()) {
+          description = line.trim();
+          continue;
+        }
+
+        // 解析 [[]] 链接
+        const linkRegex = /\[\[([^\]]+)\]\]/g;
+        let match: RegExpExecArray | null;
+
+        while ((match = linkRegex.exec(line)) !== null) {
+          const linkText = match[1];
+
+          // 根据章节确定类型
+          if (currentSection.includes('副本') || currentSection.includes('来源') || currentSection.includes('灵感')) {
+            linkedDungeons.push({ type: 'dungeon', linkText, section: currentSection });
+          } else if (currentSection.includes('技能')) {
+            linkedSkills.push({ type: 'skill', linkText, section: currentSection });
+          } else if (currentSection.includes('装备')) {
+            linkedEquipment.push({ type: 'equip', linkText, section: currentSection });
+          } else {
+            // 默认归类为技能
+            linkedSkills.push({ type: 'skill', linkText, section: currentSection });
+          }
+        }
       }
 
       // 更新或添加套装
@@ -309,7 +339,10 @@ export class DataManager {
       const set: GameSet = {
         name,
         filePath: file.path,
-        linkedItems,
+        linkedDungeons,
+        linkedSkills,
+        linkedEquipment,
+        description,
       };
 
       if (existingIndex >= 0) {
@@ -402,12 +435,90 @@ export class DataManager {
   /**
    * 创建新套装
    */
-  async createSet(name: string): Promise<TFile> {
+  async createSet(name: string, description?: string): Promise<TFile> {
     await this.ensureSetsFolder();
     const path = `${this.settings.setsFolder}/${name}.md`;
-    const content = `# ${name}\n\n## 关联技能\n\n## 关联装备\n`;
+    const descText = description ? `${description}` : '';
+    const content = `# ${name}
+
+## 描述
+
+${descText}
+
+## 灵感来源（副本）
+
+
+## 关联技能
+
+
+## 关联装备
+
+`;
     const file = await this.app.vault.create(path, content);
     await this.updateSet(file);
     return file;
+  }
+
+  /**
+   * 向套装添加关联项
+   */
+  async addItemToSet(setFilePath: string, linkText: string, type: 'skill' | 'equip' | 'dungeon'): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(setFilePath);
+    if (!(file instanceof TFile)) return;
+
+    let content = await this.app.vault.read(file);
+
+    // 确定要添加到的章节
+    let sectionHeader: string;
+    if (type === 'dungeon') {
+      sectionHeader = '## 灵感来源（副本）';
+    } else if (type === 'skill') {
+      sectionHeader = '## 关联技能';
+    } else {
+      sectionHeader = '## 关联装备';
+    }
+
+    // 找到章节位置并插入链接
+    const sectionIndex = content.indexOf(sectionHeader);
+    if (sectionIndex === -1) {
+      // 章节不存在，添加到末尾
+      content += `\n${sectionHeader}\n\n- [[${linkText}]]\n`;
+    } else {
+      // 在章节后插入
+      const insertPos = sectionIndex + sectionHeader.length;
+      const restContent = content.substring(insertPos);
+      // 找到下一个章节或文件末尾
+      const nextSectionMatch = restContent.match(/\n## /);
+      const insertPoint = nextSectionMatch ? insertPos + (nextSectionMatch.index ?? 0) : content.length;
+
+      // 检查是否已存在该链接
+      const sectionContent = content.substring(sectionIndex, insertPoint);
+      if (sectionContent.includes(`[[${linkText}]]`)) {
+        return; // 已存在，不重复添加
+      }
+
+      content = content.substring(0, insertPoint) + `- [[${linkText}]]\n` + content.substring(insertPoint);
+    }
+
+    await this.app.vault.modify(file, content);
+    await this.updateSet(file);
+  }
+
+  /**
+   * 从套装移除关联项
+   */
+  async removeItemFromSet(setFilePath: string, linkText: string): Promise<void> {
+    const file = this.app.vault.getAbstractFileByPath(setFilePath);
+    if (!(file instanceof TFile)) return;
+
+    let content = await this.app.vault.read(file);
+
+    // 移除包含该链接的行
+    const lines = content.split('\n');
+    const filtered = lines.filter(line => !line.includes(`[[${linkText}]]`));
+    content = filtered.join('\n');
+
+    await this.app.vault.modify(file, content);
+    await this.updateSet(file);
   }
 }
