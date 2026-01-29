@@ -9,7 +9,7 @@ import { DataManager } from '../services/DataManager';
 import { showInputModal } from '../ui/InputModal';
 import type GameManagerPlugin from '../main';
 
-type TabType = 'home' | 'skills' | 'equipment' | 'dungeon';
+type TabType = 'home' | 'skills' | 'equipment' | 'dungeon' | 'sets';
 
 // 浏览状态：记录当前路径
 interface BrowseState {
@@ -79,6 +79,7 @@ export class GameManagerView extends ItemView {
       { id: 'skills', label: '⚔️ 技能', icon: 'zap' },
       { id: 'equipment', label: '🛡️ 装备', icon: 'shield' },
       { id: 'dungeon', label: '🏰 副本', icon: 'castle' },
+      { id: 'sets', label: '👑 套装', icon: 'crown' },
     ];
 
     tabs.forEach(tab => {
@@ -121,6 +122,9 @@ export class GameManagerView extends ItemView {
         break;
       case 'dungeon':
         this.renderCardTab('dungeon', this.dataManager.getDungeonTree(), '副本', '闪念笔记', '🏰');
+        break;
+      case 'sets':
+        this.renderSetsTab();
         break;
     }
   }
@@ -175,6 +179,9 @@ export class GameManagerView extends ItemView {
 
     // 套装区域
     this.renderSetsSection();
+
+    // 知识关系网络
+    this.renderKnowledgeNetwork();
 
     // 操作按钮
     const actionsContainer = this.mainContentEl.createDiv({ cls: 'gm-actions' });
@@ -356,6 +363,134 @@ export class GameManagerView extends ItemView {
       cls: 'gm-tip',
       text: '💡 标签格式：#类型-分类1-分类2-...-内容，最后一项为具体内容，前面为层级目录',
     });
+
+    // 快捷键指南
+    const shortcuts = help.createDiv({ cls: 'gm-shortcuts' });
+    shortcuts.createEl('h5', { text: '⌨️ 快捷键' });
+    const shortcutList = [
+      { key: 'Alt+X', desc: '摘录选中文本到子副本' },
+      { key: 'Alt+S', desc: '提炼选中内容为技能' },
+      { key: 'Alt+E', desc: '提炼选中内容为装备' },
+    ];
+    shortcutList.forEach(s => {
+      const item = shortcuts.createDiv({ cls: 'gm-shortcut-item' });
+      item.createSpan({ cls: 'gm-shortcut-key', text: s.key });
+      item.createSpan({ cls: 'gm-shortcut-desc', text: s.desc });
+    });
+  }
+
+  /**
+   * 渲染套装标签页
+   */
+  private renderSetsTab(): void {
+    // 标题
+    this.mainContentEl.createEl('h3', { text: '👑 套装' });
+    this.mainContentEl.createEl('p', { text: '项目索引 - 组合技能、装备和副本', cls: 'gm-panel-desc' });
+
+    const sets = this.dataManager.getSets();
+
+    if (sets.length === 0) {
+      const empty = this.mainContentEl.createDiv({ cls: 'gm-empty' });
+      empty.createSpan({ text: '暂无套装，' });
+      const createLink = empty.createEl('a', { text: '创建第一个套装' });
+      createLink.addEventListener('click', () => this.createNewSet());
+    } else {
+      // 套装卡片网格
+      const cardsContainer = this.mainContentEl.createDiv({ cls: 'gm-cards-container gm-sets-grid' });
+      sets.forEach(set => {
+        this.renderSetFolderCard(cardsContainer, set);
+      });
+    }
+
+    // 新建按钮
+    const actionsContainer = this.mainContentEl.createDiv({ cls: 'gm-actions' });
+    const addBtn = actionsContainer.createEl('button', {
+      cls: 'gm-btn gm-btn-primary',
+      text: '+ 新建套装',
+    });
+    addBtn.addEventListener('click', () => this.createNewSet());
+  }
+
+  /**
+   * 渲染知识关系网络（简单列表形式）
+   */
+  private renderKnowledgeNetwork(): void {
+    const section = this.mainContentEl.createDiv({ cls: 'gm-section gm-network-section' });
+    section.createEl('h4', { text: '🔗 知识关系网络' });
+
+    // 收集关系
+    const relations: { from: string; fromType: string; to: string; toType: string; relation: string }[] = [];
+
+    // 从 frontmatter 中解析来源关系（需要 DataManager 支持）
+    // 目前先显示套装中的关联关系
+    const sets = this.dataManager.getSets();
+
+    sets.forEach(set => {
+      // 套装 → 副本
+      set.linkedDungeons?.forEach(d => {
+        relations.push({
+          from: set.name,
+          fromType: 'set',
+          to: d.linkText,
+          toType: 'dungeon',
+          relation: '来源于',
+        });
+      });
+
+      // 套装 → 技能
+      set.linkedSkills?.forEach(s => {
+        relations.push({
+          from: set.name,
+          fromType: 'set',
+          to: s.linkText,
+          toType: 'skill',
+          relation: '包含',
+        });
+      });
+
+      // 套装 → 装备
+      set.linkedEquipment?.forEach(e => {
+        relations.push({
+          from: set.name,
+          fromType: 'set',
+          to: e.linkText,
+          toType: 'equip',
+          relation: '包含',
+        });
+      });
+    });
+
+    if (relations.length === 0) {
+      section.createDiv({ cls: 'gm-empty', text: '暂无关联关系，创建套装后将在此显示' });
+      return;
+    }
+
+    // 渲染关系列表
+    const list = section.createDiv({ cls: 'gm-relation-list' });
+
+    const typeIcons: Record<string, string> = {
+      set: '👑',
+      skill: '⚔️',
+      equip: '🛡️',
+      dungeon: '🏰',
+    };
+
+    // 只显示前 10 条
+    const displayRelations = relations.slice(0, 10);
+    displayRelations.forEach(rel => {
+      const item = list.createDiv({ cls: 'gm-relation-item' });
+      item.innerHTML = `
+        <span class="gm-rel-from">${typeIcons[rel.fromType]} ${rel.from}</span>
+        <span class="gm-rel-arrow">→</span>
+        <span class="gm-rel-label">${rel.relation}</span>
+        <span class="gm-rel-arrow">→</span>
+        <span class="gm-rel-to">${typeIcons[rel.toType]} ${rel.to}</span>
+      `;
+    });
+
+    if (relations.length > 10) {
+      list.createDiv({ cls: 'gm-relation-more', text: `还有 ${relations.length - 10} 条关系...` });
+    }
   }
 
   /**

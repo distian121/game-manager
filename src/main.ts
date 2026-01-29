@@ -13,11 +13,13 @@ import {
 } from './types';
 import { DataManager } from './services/DataManager';
 import { GameManagerView } from './views/GameManagerView';
+import { ExtractCommands } from './commands/ExtractCommands';
 
 export default class GameManagerPlugin extends Plugin {
   settings: GameManagerSettings;
   dataManager: DataManager;
   private view: GameManagerView | null = null;
+  private extractCommands: ExtractCommands;
 
   async onload(): Promise<void> {
     console.log('Loading Game Manager plugin');
@@ -57,6 +59,36 @@ export default class GameManagerPlugin extends Plugin {
       name: '重新扫描 Vault',
       callback: async () => {
         await this.rescan();
+      },
+    });
+
+    // 初始化摘录命令
+    this.extractCommands = new ExtractCommands(this);
+
+    // 摘录到子副本 (Alt+X)
+    this.addCommand({
+      id: 'extract-to-sub-dungeon',
+      name: '摘录到子副本 (Extract)',
+      editorCallback: (editor, view) => {
+        this.extractCommands.extractToSubDungeon(editor, view);
+      },
+    });
+
+    // 提炼为技能 (Alt+S)
+    this.addCommand({
+      id: 'extract-to-skill',
+      name: '提炼为技能 (Skill)',
+      editorCallback: (editor, view) => {
+        this.extractCommands.extractToSkill(editor, view);
+      },
+    });
+
+    // 提炼为装备 (Alt+E)
+    this.addCommand({
+      id: 'extract-to-equipment',
+      name: '提炼为装备 (Equip)',
+      editorCallback: (editor, view) => {
+        this.extractCommands.extractToEquipment(editor, view);
       },
     });
 

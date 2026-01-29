@@ -22,7 +22,7 @@ __export(main_exports, {
   default: () => GameManagerPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian4 = require("obsidian");
+var import_obsidian5 = require("obsidian");
 
 // src/types.ts
 var DEFAULT_SETTINGS = {
@@ -545,6 +545,9 @@ var InputModal = class extends import_obsidian2.Modal {
     var _a;
     super(app);
     this.result = null;
+    // 使用类成员变量解决闭包作用域问题
+    this.nameValue = "";
+    this.descValue = "";
     this.title = options.title;
     this.namePlaceholder = options.namePlaceholder || "\u8F93\u5165\u540D\u79F0";
     this.showDescription = (_a = options.showDescription) != null ? _a : true;
@@ -554,17 +557,17 @@ var InputModal = class extends import_obsidian2.Modal {
     const { contentEl } = this;
     contentEl.addClass("gm-input-modal");
     contentEl.createEl("h2", { text: this.title });
-    let nameValue = "";
-    let descValue = "";
-    new import_obsidian2.Setting(contentEl).setName("\u540D\u79F0").setDesc("\u5957\u88C5\u540D\u79F0\uFF08\u5C06\u4F5C\u4E3A\u6587\u4EF6\u540D\uFF09").addText(
+    this.nameValue = "";
+    this.descValue = "";
+    new import_obsidian2.Setting(contentEl).setName("\u540D\u79F0").setDesc("\u540D\u79F0\uFF08\u5C06\u4F5C\u4E3A\u6587\u4EF6\u540D\uFF09").addText(
       (text) => text.setPlaceholder(this.namePlaceholder).onChange((value) => {
-        nameValue = value;
+        this.nameValue = value;
       })
     );
     if (this.showDescription) {
       new import_obsidian2.Setting(contentEl).setName("\u63CF\u8FF0").setDesc("\u7B80\u77ED\u63CF\u8FF0\uFF08\u53EF\u9009\uFF09").addTextArea(
-        (textarea) => textarea.setPlaceholder("\u8F93\u5165\u5957\u88C5\u63CF\u8FF0...").onChange((value) => {
-          descValue = value;
+        (textarea) => textarea.setPlaceholder("\u8F93\u5165\u63CF\u8FF0...").onChange((value) => {
+          this.descValue = value;
         })
       );
     }
@@ -581,20 +584,20 @@ var InputModal = class extends import_obsidian2.Modal {
       cls: "gm-btn gm-btn-primary"
     });
     submitBtn.addEventListener("click", () => {
-      if (nameValue.trim()) {
+      if (this.nameValue.trim()) {
         this.result = {
-          name: nameValue.trim(),
-          description: descValue.trim() || void 0
+          name: this.nameValue.trim(),
+          description: this.descValue.trim() || void 0
         };
         this.close();
       }
     });
     contentEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
-        if (nameValue.trim()) {
+        if (this.nameValue.trim()) {
           this.result = {
-            name: nameValue.trim(),
-            description: descValue.trim() || void 0
+            name: this.nameValue.trim(),
+            description: this.descValue.trim() || void 0
           };
           this.close();
         }
@@ -659,7 +662,8 @@ var GameManagerView = class extends import_obsidian3.ItemView {
       { id: "home", label: "\u{1F3E0} \u4E3B\u9875", icon: "home" },
       { id: "skills", label: "\u2694\uFE0F \u6280\u80FD", icon: "zap" },
       { id: "equipment", label: "\u{1F6E1}\uFE0F \u88C5\u5907", icon: "shield" },
-      { id: "dungeon", label: "\u{1F3F0} \u526F\u672C", icon: "castle" }
+      { id: "dungeon", label: "\u{1F3F0} \u526F\u672C", icon: "castle" },
+      { id: "sets", label: "\u{1F451} \u5957\u88C5", icon: "crown" }
     ];
     tabs.forEach((tab) => {
       const btn = tabsContainer.createEl("button", {
@@ -695,6 +699,9 @@ var GameManagerView = class extends import_obsidian3.ItemView {
         break;
       case "dungeon":
         this.renderCardTab("dungeon", this.dataManager.getDungeonTree(), "\u526F\u672C", "\u95EA\u5FF5\u7B14\u8BB0", "\u{1F3F0}");
+        break;
+      case "sets":
+        this.renderSetsTab();
         break;
     }
   }
@@ -736,6 +743,7 @@ var GameManagerView = class extends import_obsidian3.ItemView {
       });
     });
     this.renderSetsSection();
+    this.renderKnowledgeNetwork();
     const actionsContainer = this.mainContentEl.createDiv({ cls: "gm-actions" });
     const scanBtn = actionsContainer.createEl("button", {
       cls: "gm-btn gm-btn-primary",
@@ -882,6 +890,107 @@ var GameManagerView = class extends import_obsidian3.ItemView {
       cls: "gm-tip",
       text: "\u{1F4A1} \u6807\u7B7E\u683C\u5F0F\uFF1A#\u7C7B\u578B-\u5206\u7C7B1-\u5206\u7C7B2-...-\u5185\u5BB9\uFF0C\u6700\u540E\u4E00\u9879\u4E3A\u5177\u4F53\u5185\u5BB9\uFF0C\u524D\u9762\u4E3A\u5C42\u7EA7\u76EE\u5F55"
     });
+    const shortcuts = help.createDiv({ cls: "gm-shortcuts" });
+    shortcuts.createEl("h5", { text: "\u2328\uFE0F \u5FEB\u6377\u952E" });
+    const shortcutList = [
+      { key: "Alt+X", desc: "\u6458\u5F55\u9009\u4E2D\u6587\u672C\u5230\u5B50\u526F\u672C" },
+      { key: "Alt+S", desc: "\u63D0\u70BC\u9009\u4E2D\u5185\u5BB9\u4E3A\u6280\u80FD" },
+      { key: "Alt+E", desc: "\u63D0\u70BC\u9009\u4E2D\u5185\u5BB9\u4E3A\u88C5\u5907" }
+    ];
+    shortcutList.forEach((s) => {
+      const item = shortcuts.createDiv({ cls: "gm-shortcut-item" });
+      item.createSpan({ cls: "gm-shortcut-key", text: s.key });
+      item.createSpan({ cls: "gm-shortcut-desc", text: s.desc });
+    });
+  }
+  /**
+   * 渲染套装标签页
+   */
+  renderSetsTab() {
+    this.mainContentEl.createEl("h3", { text: "\u{1F451} \u5957\u88C5" });
+    this.mainContentEl.createEl("p", { text: "\u9879\u76EE\u7D22\u5F15 - \u7EC4\u5408\u6280\u80FD\u3001\u88C5\u5907\u548C\u526F\u672C", cls: "gm-panel-desc" });
+    const sets = this.dataManager.getSets();
+    if (sets.length === 0) {
+      const empty = this.mainContentEl.createDiv({ cls: "gm-empty" });
+      empty.createSpan({ text: "\u6682\u65E0\u5957\u88C5\uFF0C" });
+      const createLink = empty.createEl("a", { text: "\u521B\u5EFA\u7B2C\u4E00\u4E2A\u5957\u88C5" });
+      createLink.addEventListener("click", () => this.createNewSet());
+    } else {
+      const cardsContainer = this.mainContentEl.createDiv({ cls: "gm-cards-container gm-sets-grid" });
+      sets.forEach((set) => {
+        this.renderSetFolderCard(cardsContainer, set);
+      });
+    }
+    const actionsContainer = this.mainContentEl.createDiv({ cls: "gm-actions" });
+    const addBtn = actionsContainer.createEl("button", {
+      cls: "gm-btn gm-btn-primary",
+      text: "+ \u65B0\u5EFA\u5957\u88C5"
+    });
+    addBtn.addEventListener("click", () => this.createNewSet());
+  }
+  /**
+   * 渲染知识关系网络（简单列表形式）
+   */
+  renderKnowledgeNetwork() {
+    const section = this.mainContentEl.createDiv({ cls: "gm-section gm-network-section" });
+    section.createEl("h4", { text: "\u{1F517} \u77E5\u8BC6\u5173\u7CFB\u7F51\u7EDC" });
+    const relations = [];
+    const sets = this.dataManager.getSets();
+    sets.forEach((set) => {
+      var _a, _b, _c;
+      (_a = set.linkedDungeons) == null ? void 0 : _a.forEach((d) => {
+        relations.push({
+          from: set.name,
+          fromType: "set",
+          to: d.linkText,
+          toType: "dungeon",
+          relation: "\u6765\u6E90\u4E8E"
+        });
+      });
+      (_b = set.linkedSkills) == null ? void 0 : _b.forEach((s) => {
+        relations.push({
+          from: set.name,
+          fromType: "set",
+          to: s.linkText,
+          toType: "skill",
+          relation: "\u5305\u542B"
+        });
+      });
+      (_c = set.linkedEquipment) == null ? void 0 : _c.forEach((e) => {
+        relations.push({
+          from: set.name,
+          fromType: "set",
+          to: e.linkText,
+          toType: "equip",
+          relation: "\u5305\u542B"
+        });
+      });
+    });
+    if (relations.length === 0) {
+      section.createDiv({ cls: "gm-empty", text: "\u6682\u65E0\u5173\u8054\u5173\u7CFB\uFF0C\u521B\u5EFA\u5957\u88C5\u540E\u5C06\u5728\u6B64\u663E\u793A" });
+      return;
+    }
+    const list = section.createDiv({ cls: "gm-relation-list" });
+    const typeIcons = {
+      set: "\u{1F451}",
+      skill: "\u2694\uFE0F",
+      equip: "\u{1F6E1}\uFE0F",
+      dungeon: "\u{1F3F0}"
+    };
+    const displayRelations = relations.slice(0, 10);
+    displayRelations.forEach((rel) => {
+      const item = list.createDiv({ cls: "gm-relation-item" });
+      item.innerHTML = `
+        <span class="gm-rel-from">${typeIcons[rel.fromType]} ${rel.from}</span>
+        <span class="gm-rel-arrow">\u2192</span>
+        <span class="gm-rel-label">${rel.relation}</span>
+        <span class="gm-rel-arrow">\u2192</span>
+        <span class="gm-rel-to">${typeIcons[rel.toType]} ${rel.to}</span>
+      `;
+    });
+    if (relations.length > 10) {
+      list.createDiv({ cls: "gm-relation-more", text: `\u8FD8\u6709 ${relations.length - 10} \u6761\u5173\u7CFB...` });
+    }
   }
   /**
    * 渲染卡片式标签页（技能/装备/副本）- 三层嵌套卡片系统
@@ -1162,8 +1271,219 @@ var GameManagerView = class extends import_obsidian3.ItemView {
   }
 };
 
+// src/commands/ExtractCommands.ts
+var import_obsidian4 = require("obsidian");
+var ExtractCommands = class {
+  constructor(plugin) {
+    this.plugin = plugin;
+  }
+  /**
+   * 从选中文本创建子副本
+   * Alt+X 快捷键
+   */
+  async extractToSubDungeon(editor, view) {
+    var _a;
+    const selectedText = editor.getSelection();
+    if (!selectedText) {
+      new import_obsidian4.Notice("\u8BF7\u5148\u9009\u4E2D\u8981\u6458\u5F55\u7684\u6587\u672C");
+      return;
+    }
+    const currentFile = view.file;
+    if (!currentFile) {
+      new import_obsidian4.Notice("\u65E0\u6CD5\u83B7\u53D6\u5F53\u524D\u6587\u4EF6");
+      return;
+    }
+    const parentPath = await this.getDungeonPath(currentFile);
+    const result = await showInputModal(this.plugin.app, {
+      title: "\u521B\u5EFA\u5B50\u526F\u672C",
+      namePlaceholder: "\u8F93\u5165\u5B50\u526F\u672C\u540D\u79F0",
+      showDescription: false
+    });
+    if (!(result == null ? void 0 : result.name))
+      return;
+    const subName = result.name;
+    const newTag = parentPath.length > 0 ? `#dungeon-${parentPath.join("-")}-${subName}` : `#dungeon-${subName}`;
+    const parentDir = ((_a = currentFile.parent) == null ? void 0 : _a.path) || "";
+    const newFilePath = (0, import_obsidian4.normalizePath)(`${parentDir}/${subName}.md`);
+    const existingFile = this.plugin.app.vault.getAbstractFileByPath(newFilePath);
+    if (existingFile) {
+      new import_obsidian4.Notice(`\u6587\u4EF6\u5DF2\u5B58\u5728: ${subName}.md`);
+      return;
+    }
+    const sourceLine = editor.getCursor("from").line + 1;
+    const content = this.buildSubDungeonContent({
+      tag: newTag,
+      name: subName,
+      extractedText: selectedText,
+      sourceFile: currentFile.path,
+      sourceLine
+    });
+    try {
+      const newFile = await this.plugin.app.vault.create(newFilePath, content);
+      const linkText = `
+
+> \u{1F4DD} \u6458\u5F55\u81F3 [[${subName}]]
+`;
+      editor.replaceSelection(selectedText + linkText);
+      await this.plugin.app.workspace.openLinkText(newFile.path, "", true);
+      new import_obsidian4.Notice(`\u5DF2\u521B\u5EFA\u5B50\u526F\u672C: ${subName}`);
+    } catch (error) {
+      new import_obsidian4.Notice(`\u521B\u5EFA\u6587\u4EF6\u5931\u8D25: ${error}`);
+    }
+  }
+  /**
+   * 从选中文本提炼为技能
+   * Alt+S 快捷键
+   */
+  async extractToSkill(editor, view) {
+    await this.extractToType(editor, view, "skill");
+  }
+  /**
+   * 从选中文本提炼为装备
+   * Alt+E 快捷键
+   */
+  async extractToEquipment(editor, view) {
+    await this.extractToType(editor, view, "equip");
+  }
+  /**
+   * 通用提炼方法
+   */
+  async extractToType(editor, view, type) {
+    var _a;
+    const selectedText = editor.getSelection();
+    const currentFile = view.file;
+    if (!currentFile) {
+      new import_obsidian4.Notice("\u65E0\u6CD5\u83B7\u53D6\u5F53\u524D\u6587\u4EF6");
+      return;
+    }
+    const typeLabel = type === "skill" ? "\u6280\u80FD" : "\u88C5\u5907";
+    const typeIcon = type === "skill" ? "\u2694\uFE0F" : "\u{1F6E1}\uFE0F";
+    const result = await showInputModal(this.plugin.app, {
+      title: `\u63D0\u70BC\u4E3A${typeLabel}`,
+      namePlaceholder: `\u8F93\u5165${typeLabel}\u540D\u79F0`,
+      showDescription: true
+    });
+    if (!(result == null ? void 0 : result.name))
+      return;
+    const name = result.name;
+    const sourceLine = editor.getCursor("from").line + 1;
+    const tag = `#${type}-${name}`;
+    if (selectedText && selectedText.length < 300) {
+      const content = `
+
+${tag}
+${selectedText}
+`;
+      editor.replaceSelection(content);
+      new import_obsidian4.Notice(`\u5DF2\u6DFB\u52A0${typeLabel}: ${name}`);
+    } else {
+      const parentDir = ((_a = currentFile.parent) == null ? void 0 : _a.path) || "";
+      const filePath = (0, import_obsidian4.normalizePath)(`${parentDir}/${name}.md`);
+      const existingFile = this.plugin.app.vault.getAbstractFileByPath(filePath);
+      if (existingFile) {
+        new import_obsidian4.Notice(`\u6587\u4EF6\u5DF2\u5B58\u5728: ${name}.md`);
+        return;
+      }
+      const fileContent = this.buildKnowledgeContent({
+        tag,
+        name,
+        type,
+        description: result.description,
+        extractedText: selectedText || "",
+        sourceFile: currentFile.path,
+        sourceLine
+      });
+      try {
+        await this.plugin.app.vault.create(filePath, fileContent);
+        const replacement = selectedText ? `${selectedText}
+
+> ${typeIcon} \u5DF2\u63D0\u70BC\u4E3A${typeLabel} [[${name}]]
+` : `> ${typeIcon} \u5DF2\u521B\u5EFA${typeLabel} [[${name}]]
+`;
+        editor.replaceSelection(replacement);
+        new import_obsidian4.Notice(`\u5DF2\u521B\u5EFA${typeLabel}: ${name}`);
+      } catch (error) {
+        new import_obsidian4.Notice(`\u521B\u5EFA\u6587\u4EF6\u5931\u8D25: ${error}`);
+      }
+    }
+  }
+  /**
+   * 获取当前文件的副本标签路径
+   */
+  async getDungeonPath(file) {
+    try {
+      const content = await this.plugin.app.vault.read(file);
+      const match = content.match(/#dungeon(-[a-zA-Z0-9\u4e00-\u9fa5_]+)+/);
+      if (!match)
+        return [];
+      const tagContent = match[0].substring(9);
+      return tagContent.split("-").filter((p) => p.length > 0);
+    } catch (e) {
+      return [];
+    }
+  }
+  /**
+   * 构建子副本文件内容
+   */
+  buildSubDungeonContent(params) {
+    const sourceFileName = params.sourceFile.replace(".md", "");
+    return `---
+source: "[[${sourceFileName}]]"
+source-line: ${params.sourceLine}
+created: ${(/* @__PURE__ */ new Date()).toISOString()}
+type: extract
+---
+
+${params.tag}
+
+# ${params.name}
+
+## \u6458\u5F55\u5185\u5BB9
+
+${params.extractedText}
+
+## \u6211\u7684\u7406\u89E3
+
+<!-- \u5728\u8FD9\u91CC\u6DFB\u52A0\u4F60\u7684\u601D\u8003\u548C\u603B\u7ED3 -->
+<!-- \u53EF\u4EE5\u7EE7\u7EED\u4F7F\u7528 Alt+X \u6458\u5F55\uFF0C\u6216\u4F7F\u7528 Alt+S/E \u63D0\u70BC\u4E3A\u6280\u80FD/\u88C5\u5907 -->
+
+`;
+  }
+  /**
+   * 构建技能/装备文件内容
+   */
+  buildKnowledgeContent(params) {
+    const sourceFileName = params.sourceFile.replace(".md", "");
+    const typeLabel = params.type === "skill" ? "\u6280\u80FD" : "\u88C5\u5907";
+    return `---
+source: "[[${sourceFileName}]]"
+source-line: ${params.sourceLine}
+created: ${(/* @__PURE__ */ new Date()).toISOString()}
+type: ${params.type}
+---
+
+${params.tag}
+
+# ${params.name}
+
+${params.description ? `## \u63CF\u8FF0
+
+${params.description}
+` : ""}
+## \u5185\u5BB9
+
+${params.extractedText || `<!-- \u5728\u8FD9\u91CC\u8BE6\u7EC6\u63CF\u8FF0\u8FD9\u4E2A${typeLabel} -->`}
+
+## \u5173\u8054
+
+<!-- \u53EF\u4EE5\u94FE\u63A5\u76F8\u5173\u7684\u6280\u80FD\u3001\u88C5\u5907\u6216\u526F\u672C -->
+
+`;
+  }
+};
+
 // src/main.ts
-var GameManagerPlugin = class extends import_obsidian4.Plugin {
+var GameManagerPlugin = class extends import_obsidian5.Plugin {
   constructor() {
     super(...arguments);
     this.view = null;
@@ -1195,24 +1515,46 @@ var GameManagerPlugin = class extends import_obsidian4.Plugin {
         await this.rescan();
       }
     });
+    this.extractCommands = new ExtractCommands(this);
+    this.addCommand({
+      id: "extract-to-sub-dungeon",
+      name: "\u6458\u5F55\u5230\u5B50\u526F\u672C (Extract)",
+      editorCallback: (editor, view) => {
+        this.extractCommands.extractToSubDungeon(editor, view);
+      }
+    });
+    this.addCommand({
+      id: "extract-to-skill",
+      name: "\u63D0\u70BC\u4E3A\u6280\u80FD (Skill)",
+      editorCallback: (editor, view) => {
+        this.extractCommands.extractToSkill(editor, view);
+      }
+    });
+    this.addCommand({
+      id: "extract-to-equipment",
+      name: "\u63D0\u70BC\u4E3A\u88C5\u5907 (Equip)",
+      editorCallback: (editor, view) => {
+        this.extractCommands.extractToEquipment(editor, view);
+      }
+    });
     if (this.settings.enableRealTimeUpdate) {
       this.registerEvent(
         this.app.vault.on("modify", (file) => {
-          if (file instanceof import_obsidian4.TFile && file.extension === "md") {
+          if (file instanceof import_obsidian5.TFile && file.extension === "md") {
             this.onFileModify(file);
           }
         })
       );
       this.registerEvent(
         this.app.vault.on("delete", (file) => {
-          if (file instanceof import_obsidian4.TFile && file.extension === "md") {
+          if (file instanceof import_obsidian5.TFile && file.extension === "md") {
             this.onFileDelete(file);
           }
         })
       );
       this.registerEvent(
         this.app.vault.on("rename", (file, oldPath) => {
-          if (file instanceof import_obsidian4.TFile && file.extension === "md") {
+          if (file instanceof import_obsidian5.TFile && file.extension === "md") {
             this.onFileRename(file, oldPath);
           }
         })

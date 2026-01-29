@@ -804,3 +804,102 @@
   align-items: center;
   gap: 2px;
 }
+
+/* ===== 快捷键指南样式 ===== */
+.gm-shortcuts {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--background-modifier-border);
+}
+
+.gm-shortcuts h5 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.gm-shortcut-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.gm-shortcut-key {
+  background: var(--background-secondary);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--text-normal);
+  min-width: 60px;
+  text-align: center;
+}
+
+.gm-shortcut-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ===== 套装网格样式 ===== */
+.gm-sets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+/* ===== 知识关系网络样式 ===== */
+.gm-network-section {
+  margin-top: 24px;
+  padding: 16px;
+  background: var(--background-secondary);
+  border-radius: 12px;
+}
+
+.gm-network-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+}
+
+.gm-relation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gm-relation-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--background-primary);
+  border-radius: 8px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.gm-rel-from,
+.gm-rel-to {
+  font-weight: 500;
+  color: var(--text-normal);
+}
+
+.gm-rel-arrow {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.gm-rel-label {
+  color: var(--text-accent);
+  font-size: 11px;
+  background: var(--background-secondary);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.gm-relation-more {
+  text-align: center;
+  padding: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+}

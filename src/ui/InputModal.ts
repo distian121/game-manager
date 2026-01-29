@@ -15,6 +15,9 @@ export class InputModal extends Modal {
   private title: string;
   private namePlaceholder: string;
   private showDescription: boolean;
+  // 使用类成员变量解决闭包作用域问题
+  private nameValue = '';
+  private descValue = '';
 
   constructor(
     app: App,
@@ -38,18 +41,19 @@ export class InputModal extends Modal {
 
     contentEl.createEl('h2', { text: this.title });
 
-    let nameValue = '';
-    let descValue = '';
+    // 重置值
+    this.nameValue = '';
+    this.descValue = '';
 
     // 名称输入
     new Setting(contentEl)
       .setName('名称')
-      .setDesc('套装名称（将作为文件名）')
+      .setDesc('名称（将作为文件名）')
       .addText((text) =>
         text
           .setPlaceholder(this.namePlaceholder)
           .onChange((value) => {
-            nameValue = value;
+            this.nameValue = value;
           })
       );
 
@@ -60,9 +64,9 @@ export class InputModal extends Modal {
         .setDesc('简短描述（可选）')
         .addTextArea((textarea) =>
           textarea
-            .setPlaceholder('输入套装描述...')
+            .setPlaceholder('输入描述...')
             .onChange((value) => {
-              descValue = value;
+              this.descValue = value;
             })
         );
     }
@@ -83,10 +87,10 @@ export class InputModal extends Modal {
       cls: 'gm-btn gm-btn-primary',
     });
     submitBtn.addEventListener('click', () => {
-      if (nameValue.trim()) {
+      if (this.nameValue.trim()) {
         this.result = {
-          name: nameValue.trim(),
-          description: descValue.trim() || undefined,
+          name: this.nameValue.trim(),
+          description: this.descValue.trim() || undefined,
         };
         this.close();
       }
@@ -95,10 +99,10 @@ export class InputModal extends Modal {
     // 支持回车提交
     contentEl.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
-        if (nameValue.trim()) {
+        if (this.nameValue.trim()) {
           this.result = {
-            name: nameValue.trim(),
-            description: descValue.trim() || undefined,
+            name: this.nameValue.trim(),
+            description: this.descValue.trim() || undefined,
           };
           this.close();
         }

@@ -14,6 +14,14 @@ export interface TreeNode {
   isLeaf: boolean;        // 是否为叶子节点（内容层）
 }
 
+// 来源信息（用于知识溯源）
+export interface SourceInfo {
+  filePath: string;       // 来源文件路径
+  lineNumber?: number;    // 来源行号
+  extractedText?: string; // 摘录的原文
+  createdAt?: number;     // 创建时间戳
+}
+
 // 树中的具体内容项
 export interface TreeItem {
   content: string;        // 内容文本
@@ -22,6 +30,8 @@ export interface TreeItem {
   fullTag: string;        // 完整标签字符串
   textContent?: string;   // 标签关联的文本内容（文件开头=全文，文中=到空行）
   isFullFile?: boolean;   // 是否代表整个文件
+  origin?: SourceInfo;    // 知识来源（增量阅读溯源）
+  linkedItems?: string[]; // 关联的其他项（技能↔装备互链）
 }
 
 // 解析后的标签
