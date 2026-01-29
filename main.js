@@ -1275,6 +1275,8 @@ var GameManagerView = class extends import_obsidian3.ItemView {
 var import_obsidian4 = require("obsidian");
 var ExtractCommands = class {
   constructor(plugin) {
+    // 防止重复执行的锁
+    this.isProcessing = false;
     this.plugin = plugin;
   }
   /**
@@ -1283,42 +1285,46 @@ var ExtractCommands = class {
    */
   async extractToSubDungeon(editor, view) {
     var _a;
-    const selectedText = editor.getSelection();
-    if (!selectedText) {
-      new import_obsidian4.Notice("\u8BF7\u5148\u9009\u4E2D\u8981\u6458\u5F55\u7684\u6587\u672C");
+    if (this.isProcessing) {
       return;
     }
-    const currentFile = view.file;
-    if (!currentFile) {
-      new import_obsidian4.Notice("\u65E0\u6CD5\u83B7\u53D6\u5F53\u524D\u6587\u4EF6");
-      return;
-    }
-    const parentPath = await this.getDungeonPath(currentFile);
-    const result = await showInputModal(this.plugin.app, {
-      title: "\u521B\u5EFA\u5B50\u526F\u672C",
-      namePlaceholder: "\u8F93\u5165\u5B50\u526F\u672C\u540D\u79F0",
-      showDescription: false
-    });
-    if (!(result == null ? void 0 : result.name))
-      return;
-    const subName = result.name;
-    const newTag = parentPath.length > 0 ? `#dungeon-${parentPath.join("-")}-${subName}` : `#dungeon-${subName}`;
-    const parentDir = ((_a = currentFile.parent) == null ? void 0 : _a.path) || "";
-    const newFilePath = (0, import_obsidian4.normalizePath)(`${parentDir}/${subName}.md`);
-    const existingFile = this.plugin.app.vault.getAbstractFileByPath(newFilePath);
-    if (existingFile) {
-      new import_obsidian4.Notice(`\u6587\u4EF6\u5DF2\u5B58\u5728: ${subName}.md`);
-      return;
-    }
-    const sourceLine = editor.getCursor("from").line + 1;
-    const content = this.buildSubDungeonContent({
-      tag: newTag,
-      name: subName,
-      extractedText: selectedText,
-      sourceFile: currentFile.path,
-      sourceLine
-    });
+    this.isProcessing = true;
     try {
+      const selectedText = editor.getSelection();
+      if (!selectedText) {
+        new import_obsidian4.Notice("\u8BF7\u5148\u9009\u4E2D\u8981\u6458\u5F55\u7684\u6587\u672C");
+        return;
+      }
+      const currentFile = view.file;
+      if (!currentFile) {
+        new import_obsidian4.Notice("\u65E0\u6CD5\u83B7\u53D6\u5F53\u524D\u6587\u4EF6");
+        return;
+      }
+      const parentPath = await this.getDungeonPath(currentFile);
+      const result = await showInputModal(this.plugin.app, {
+        title: "\u521B\u5EFA\u5B50\u526F\u672C",
+        namePlaceholder: "\u8F93\u5165\u5B50\u526F\u672C\u540D\u79F0",
+        showDescription: false
+      });
+      if (!(result == null ? void 0 : result.name))
+        return;
+      const subName = result.name;
+      const newTag = parentPath.length > 0 ? `#dungeon-${parentPath.join("-")}-${subName}` : `#dungeon-${subName}`;
+      const parentDir = ((_a = currentFile.parent) == null ? void 0 : _a.path) || "";
+      const newFilePath = (0, import_obsidian4.normalizePath)(`${parentDir}/${subName}.md`);
+      const existingFile = this.plugin.app.vault.getAbstractFileByPath(newFilePath);
+      if (existingFile) {
+        new import_obsidian4.Notice(`\u6587\u4EF6\u5DF2\u5B58\u5728: ${subName}.md`);
+        return;
+      }
+      const sourceLine = editor.getCursor("from").line + 1;
+      const content = this.buildSubDungeonContent({
+        tag: newTag,
+        name: subName,
+        extractedText: selectedText,
+        sourceFile: currentFile.path,
+        sourceLine
+      });
       const newFile = await this.plugin.app.vault.create(newFilePath, content);
       const linkText = `
 
@@ -1329,6 +1335,10 @@ var ExtractCommands = class {
       new import_obsidian4.Notice(`\u5DF2\u521B\u5EFA\u5B50\u526F\u672C: ${subName}`);
     } catch (error) {
       new import_obsidian4.Notice(`\u521B\u5EFA\u6587\u4EF6\u5931\u8D25: ${error}`);
+    } finally {
+      setTimeout(() => {
+        this.isProcessing = false;
+      }, 500);
     }
   }
   /**
@@ -1350,61 +1360,71 @@ var ExtractCommands = class {
    */
   async extractToType(editor, view, type) {
     var _a;
-    const selectedText = editor.getSelection();
-    const currentFile = view.file;
-    if (!currentFile) {
-      new import_obsidian4.Notice("\u65E0\u6CD5\u83B7\u53D6\u5F53\u524D\u6587\u4EF6");
+    if (this.isProcessing) {
       return;
     }
-    const typeLabel = type === "skill" ? "\u6280\u80FD" : "\u88C5\u5907";
-    const typeIcon = type === "skill" ? "\u2694\uFE0F" : "\u{1F6E1}\uFE0F";
-    const result = await showInputModal(this.plugin.app, {
-      title: `\u63D0\u70BC\u4E3A${typeLabel}`,
-      namePlaceholder: `\u8F93\u5165${typeLabel}\u540D\u79F0`,
-      showDescription: true
-    });
-    if (!(result == null ? void 0 : result.name))
-      return;
-    const name = result.name;
-    const sourceLine = editor.getCursor("from").line + 1;
-    const tag = `#${type}-${name}`;
-    if (selectedText && selectedText.length < 300) {
-      const content = `
+    this.isProcessing = true;
+    try {
+      const selectedText = editor.getSelection();
+      const currentFile = view.file;
+      if (!currentFile) {
+        new import_obsidian4.Notice("\u65E0\u6CD5\u83B7\u53D6\u5F53\u524D\u6587\u4EF6");
+        return;
+      }
+      const typeLabel = type === "skill" ? "\u6280\u80FD" : "\u88C5\u5907";
+      const typeIcon = type === "skill" ? "\u2694\uFE0F" : "\u{1F6E1}\uFE0F";
+      const result = await showInputModal(this.plugin.app, {
+        title: `\u63D0\u70BC\u4E3A${typeLabel}`,
+        namePlaceholder: `\u8F93\u5165${typeLabel}\u540D\u79F0`,
+        showDescription: true
+      });
+      if (!(result == null ? void 0 : result.name))
+        return;
+      const name = result.name;
+      const sourceLine = editor.getCursor("from").line + 1;
+      const tag = `#${type}-${name}`;
+      if (selectedText && selectedText.length < 300) {
+        const content = `
 
 ${tag}
 ${selectedText}
 `;
-      editor.replaceSelection(content);
-      new import_obsidian4.Notice(`\u5DF2\u6DFB\u52A0${typeLabel}: ${name}`);
-    } else {
-      const parentDir = ((_a = currentFile.parent) == null ? void 0 : _a.path) || "";
-      const filePath = (0, import_obsidian4.normalizePath)(`${parentDir}/${name}.md`);
-      const existingFile = this.plugin.app.vault.getAbstractFileByPath(filePath);
-      if (existingFile) {
-        new import_obsidian4.Notice(`\u6587\u4EF6\u5DF2\u5B58\u5728: ${name}.md`);
-        return;
-      }
-      const fileContent = this.buildKnowledgeContent({
-        tag,
-        name,
-        type,
-        description: result.description,
-        extractedText: selectedText || "",
-        sourceFile: currentFile.path,
-        sourceLine
-      });
-      try {
-        await this.plugin.app.vault.create(filePath, fileContent);
-        const replacement = selectedText ? `${selectedText}
+        editor.replaceSelection(content);
+        new import_obsidian4.Notice(`\u5DF2\u6DFB\u52A0${typeLabel}: ${name}`);
+      } else {
+        const parentDir = ((_a = currentFile.parent) == null ? void 0 : _a.path) || "";
+        const filePath = (0, import_obsidian4.normalizePath)(`${parentDir}/${name}.md`);
+        const existingFile = this.plugin.app.vault.getAbstractFileByPath(filePath);
+        if (existingFile) {
+          new import_obsidian4.Notice(`\u6587\u4EF6\u5DF2\u5B58\u5728: ${name}.md`);
+          return;
+        }
+        const fileContent = this.buildKnowledgeContent({
+          tag,
+          name,
+          type,
+          description: result.description,
+          extractedText: selectedText || "",
+          sourceFile: currentFile.path,
+          sourceLine
+        });
+        try {
+          await this.plugin.app.vault.create(filePath, fileContent);
+          const replacement = selectedText ? `${selectedText}
 
 > ${typeIcon} \u5DF2\u63D0\u70BC\u4E3A${typeLabel} [[${name}]]
 ` : `> ${typeIcon} \u5DF2\u521B\u5EFA${typeLabel} [[${name}]]
 `;
-        editor.replaceSelection(replacement);
-        new import_obsidian4.Notice(`\u5DF2\u521B\u5EFA${typeLabel}: ${name}`);
-      } catch (error) {
-        new import_obsidian4.Notice(`\u521B\u5EFA\u6587\u4EF6\u5931\u8D25: ${error}`);
+          editor.replaceSelection(replacement);
+          new import_obsidian4.Notice(`\u5DF2\u521B\u5EFA${typeLabel}: ${name}`);
+        } catch (error) {
+          new import_obsidian4.Notice(`\u521B\u5EFA\u6587\u4EF6\u5931\u8D25: ${error}`);
+        }
       }
+    } finally {
+      setTimeout(() => {
+        this.isProcessing = false;
+      }, 500);
     }
   }
   /**
