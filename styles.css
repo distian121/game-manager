@@ -440,6 +440,110 @@
   font-size: 14px;
 }
 
+/* ===== Markdown 内容渲染样式 ===== */
+.gm-markdown-content {
+  overflow: hidden;
+}
+
+.gm-markdown-content p {
+  margin: 0 0 8px 0;
+}
+
+.gm-markdown-content p:last-child {
+  margin-bottom: 0;
+}
+
+.gm-markdown-content img {
+  max-width: 100%;
+  max-height: 120px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.gm-markdown-content .internal-embed {
+  max-width: 100%;
+}
+
+.gm-markdown-content .internal-embed img {
+  max-width: 100%;
+  max-height: 120px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.gm-markdown-content mjx-container {
+  font-size: 0.9em;
+}
+
+.gm-markdown-content code {
+  font-size: 0.85em;
+  padding: 2px 4px;
+  background: var(--background-secondary);
+  border-radius: 3px;
+}
+
+.gm-markdown-content pre {
+  padding: 8px;
+  background: var(--background-secondary);
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 0.85em;
+  max-height: 80px;
+}
+
+.gm-markdown-content ul,
+.gm-markdown-content ol {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+
+.gm-markdown-content li {
+  margin: 2px 0;
+}
+
+.gm-markdown-content blockquote {
+  margin: 8px 0;
+  padding: 4px 12px;
+  border-left: 3px solid var(--interactive-accent);
+  background: var(--background-secondary);
+  border-radius: 0 4px 4px 0;
+}
+
+.gm-markdown-content a.internal-link {
+  color: var(--text-accent);
+  text-decoration: none;
+}
+
+.gm-markdown-content a.internal-link:hover {
+  text-decoration: underline;
+}
+
+/* 大卡片中的 Markdown 内容 */
+.gm-card-lg .gm-markdown-content img,
+.gm-card-lg .gm-markdown-content .internal-embed img {
+  max-height: 150px;
+}
+
+/* 中卡片中的 Markdown 内容 */
+.gm-card-md .gm-markdown-content {
+  font-size: 0.9em;
+}
+
+.gm-card-md .gm-markdown-content img,
+.gm-card-md .gm-markdown-content .internal-embed img {
+  max-height: 80px;
+}
+
+/* 小卡片中的 Markdown 内容 */
+.gm-card-sm .gm-markdown-content {
+  font-size: 0.85em;
+}
+
+.gm-card-sm .gm-markdown-content img,
+.gm-card-sm .gm-markdown-content .internal-embed img {
+  max-height: 50px;
+}
+
 /* ===== 滚动条样式 ===== */
 .game-manager-view::-webkit-scrollbar {
   width: 8px;

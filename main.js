@@ -852,9 +852,8 @@ var GameManagerView = class extends import_obsidian.ItemView {
     header.createDiv({ cls: "gm-card-title", text: item.content });
     const body = card.createDiv({ cls: "gm-card-body" });
     if (item.textContent) {
-      const maxLen = size === "lg" ? 200 : size === "md" ? 80 : 40;
-      const text = item.textContent.substring(0, maxLen) + (item.textContent.length > maxLen ? "..." : "");
-      body.createDiv({ cls: "gm-content-text", text });
+      const contentEl = body.createDiv({ cls: "gm-content-text gm-markdown-content" });
+      this.renderMarkdown(item.textContent, contentEl, item.sourceFile);
     }
     const source = body.createDiv({ cls: "gm-content-source" });
     const link = source.createEl("a", { text: this.getFileName(item.sourceFile) });
@@ -874,11 +873,11 @@ var GameManagerView = class extends import_obsidian.ItemView {
     const showItems = items.slice(0, maxItems);
     const remaining = items.length - maxItems;
     showItems.forEach((item) => {
-      const itemEl = body.createDiv({ cls: "gm-content-text" });
-      const text = item.textContent ? item.textContent.substring(0, 60) : item.content;
-      itemEl.textContent = text + (item.textContent && item.textContent.length > 60 ? "..." : "");
+      const itemEl = body.createDiv({ cls: "gm-content-text gm-markdown-content" });
       itemEl.style.marginBottom = "6px";
       itemEl.style.cursor = "pointer";
+      const content = item.textContent || item.content;
+      this.renderMarkdown(content, itemEl, item.sourceFile);
       itemEl.addEventListener("click", (e) => {
         e.stopPropagation();
         this.app.workspace.openLinkText(item.sourceFile, "", false);
@@ -888,6 +887,21 @@ var GameManagerView = class extends import_obsidian.ItemView {
       const more = body.createDiv({ cls: "gm-content-source" });
       more.textContent = `+${remaining} \u66F4\u591A\u5185\u5BB9`;
     }
+  }
+  /**
+   * 使用 Obsidian 的 MarkdownRenderer 渲染 Markdown 内容
+   */
+  renderMarkdown(content, container, sourcePath) {
+    const component = new import_obsidian.Component();
+    component.load();
+    import_obsidian.MarkdownRenderer.render(
+      this.app,
+      content,
+      container,
+      sourcePath,
+      component
+    );
+    this.register(() => component.unload());
   }
   /**
    * 获取节点预览文本

@@ -3,7 +3,7 @@
  * 主编辑区视图，包含4个标签页：主界面、Skills、Equipment、Dungeon
  */
 
-import { ItemView, WorkspaceLeaf } from 'obsidian';
+import { ItemView, WorkspaceLeaf, MarkdownRenderer, Component } from 'obsidian';
 import { VIEW_TYPE_GAME_MANAGER, TreeNode, GameSet, TreeItem } from '../types';
 import { DataManager } from '../services/DataManager';
 import type GameManagerPlugin from '../main';
@@ -556,9 +556,9 @@ export class GameManagerView extends ItemView {
     const body = card.createDiv({ cls: 'gm-card-body' });
 
     if (item.textContent) {
-      const maxLen = size === 'lg' ? 200 : size === 'md' ? 80 : 40;
-      const text = item.textContent.substring(0, maxLen) + (item.textContent.length > maxLen ? '...' : '');
-      body.createDiv({ cls: 'gm-content-text', text });
+      const contentEl = body.createDiv({ cls: 'gm-content-text gm-markdown-content' });
+      // 使用 Markdown 渲染器渲染内容
+      this.renderMarkdown(item.textContent, contentEl, item.sourceFile);
     }
 
     // 来源
@@ -584,11 +584,14 @@ export class GameManagerView extends ItemView {
     const remaining = items.length - maxItems;
 
     showItems.forEach(item => {
-      const itemEl = body.createDiv({ cls: 'gm-content-text' });
-      const text = item.textContent ? item.textContent.substring(0, 60) : item.content;
-      itemEl.textContent = text + (item.textContent && item.textContent.length > 60 ? '...' : '');
+      const itemEl = body.createDiv({ cls: 'gm-content-text gm-markdown-content' });
       itemEl.style.marginBottom = '6px';
       itemEl.style.cursor = 'pointer';
+      
+      // 使用 Markdown 渲染器渲染内容
+      const content = item.textContent || item.content;
+      this.renderMarkdown(content, itemEl, item.sourceFile);
+      
       itemEl.addEventListener('click', (e) => {
         e.stopPropagation();
         this.app.workspace.openLinkText(item.sourceFile, '', false);
@@ -599,6 +602,27 @@ export class GameManagerView extends ItemView {
       const more = body.createDiv({ cls: 'gm-content-source' });
       more.textContent = `+${remaining} 更多内容`;
     }
+  }
+
+  /**
+   * 使用 Obsidian 的 MarkdownRenderer 渲染 Markdown 内容
+   */
+  private renderMarkdown(content: string, container: HTMLElement, sourcePath: string): void {
+    // 创建一个组件用于管理渲染生命周期
+    const component = new Component();
+    component.load();
+    
+    // 渲染 Markdown
+    MarkdownRenderer.render(
+      this.app,
+      content,
+      container,
+      sourcePath,
+      component
+    );
+    
+    // 注册清理
+    this.register(() => component.unload());
   }
 
   /**
